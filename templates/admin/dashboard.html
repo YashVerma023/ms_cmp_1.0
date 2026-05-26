@@ -22,10 +22,7 @@
             </div>
 
             <div class="topbar-actions">
-
-                <button type="button" class="theme-toggle" data-theme-toggle>
-                    Dark Mode
-                </button>
+                <button type="button" class="theme-toggle" data-theme-toggle>Dark Mode</button>
 
                 <div class="settings-wrapper">
                     <button type="button" class="settings-btn" id="settingsButton">
@@ -35,69 +32,303 @@
 
                     <div class="settings-dropdown" id="settingsDropdown">
                         <div class="settings-dropdown-header">Settings</div>
-
                         <a href="#" class="settings-dropdown-item" id="adminControlBtn">
                             <span>◎</span>
                             <span>Admin Control</span>
                         </a>
-
                         <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
                             Log Out
                         </a>
                     </div>
                 </div>
-
             </div>
         </header>
 
-        <section class="page-container">
+        <div class="app-body">
 
-            <div class="page-header">
-                <h1 class="page-title">Welcome, {{ name }}</h1>
-                <p class="page-subtitle">
-                    Logged in as {{ role }} | {{ email }}
-                </p>
+            <!-- ── Sidebar ─────────────────────────────────────── -->
+            <nav class="sidebar">
+                <span class="sidebar-label">Navigation</span>
+                <a href="{{ url_for('admin_dashboard') }}" class="sidebar-item active">
+                    <span class="sidebar-icon">⊞</span>
+                    Dashboard
+                </a>
+                <a href="{{ url_for('admin_tables') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊟</span>
+                    Tables
+                </a>
+            </nav>
+
+            <!-- ── Main Content ───────────────────────────────── -->
+            <div class="main-content">
+                <section class="page-container">
+                    <div class="page-header">
+                        <h1 class="page-title">Welcome, {{ name }}</h1>
+                        <p class="page-subtitle">Logged in as {{ role }} | {{ email }}</p>
+                    </div>
+
+                    <div class="grid grid-4">
+                        <div class="card dashboard-card dashboard-card-blue">
+                            <div class="dashboard-card-icon">🛡️</div>
+                            <h2 class="card-title">Role Access</h2>
+                            <p class="card-subtitle">Admin control panel</p>
+                            <h3 class="dashboard-card-value">Admin</h3>
+                        </div>
+                        <div class="card dashboard-card dashboard-card-green">
+                            <div class="dashboard-card-icon">👥</div>
+                            <h2 class="card-title">Clients</h2>
+                            <p class="card-subtitle">Managed client accounts</p>
+                            <h3 class="dashboard-card-value">Active</h3>
+                        </div>
+                        <div class="card dashboard-card dashboard-card-purple">
+                            <div class="dashboard-card-icon">🗄️</div>
+                            <h2 class="card-title">Servers</h2>
+                            <p class="card-subtitle">Server infrastructure</p>
+                            <h3 class="dashboard-card-value">Online</h3>
+                        </div>
+                        <div class="card dashboard-card dashboard-card-orange">
+                            <div class="dashboard-card-icon">📊</div>
+                            <h2 class="card-title">Monitoring</h2>
+                            <p class="card-subtitle">Logs and app tracking</p>
+                            <h3 class="dashboard-card-value">Live</h3>
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            <div class="grid grid-4">
-
-                <div class="card dashboard-card dashboard-card-purple">
-                    <div class="dashboard-card-icon">🔑</div>
-                    <h2 class="card-title">Role Access</h2>
-                    <p class="card-subtitle">Manage operational access</p>
-                    <h3 class="dashboard-card-value">Admin</h3>
-                </div>
-
-                <div class="card dashboard-card dashboard-card-blue">
-                    <div class="dashboard-card-icon">🖥️</div>
-                    <h2 class="card-title">Server Info</h2>
-                    <p class="card-subtitle">Server and login records</p>
-                    <h3 class="dashboard-card-value">Active</h3>
-                </div>
-
-                <div class="card dashboard-card dashboard-card-green">
-                    <div class="dashboard-card-icon">⚙️</div>
-                    <h2 class="card-title">Operations</h2>
-                    <p class="card-subtitle">Daily operation activity</p>
-                    <h3 class="dashboard-card-value">Live</h3>
-                </div>
-
-                <div class="card dashboard-card dashboard-card-orange">
-                    <div class="dashboard-card-icon">📋</div>
-                    <h2 class="card-title">Monitoring</h2>
-                    <p class="card-subtitle">System and user tracking</p>
-                    <h3 class="dashboard-card-value">Live</h3>
-                </div>
-
-            </div>
-
-        </section>
-
+        </div>
     </main>
 
-    {% include 'partials/admin_panel_modal.html' %}
+
+    <!-- ============================================================ -->
+    <!-- ADMIN PANEL MODAL — ADMIN                                    -->
+    <!-- Tabs: Add Client | Add Server  (single-add only)            -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="adminPanelModal" role="dialog" aria-modal="true">
+        <div class="modal-box">
+
+            <div class="modal-header">
+                <h2 class="modal-title">Admin Panel</h2>
+                <button type="button" class="modal-close" id="adminPanelClose" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="modal-tabs" role="tablist">
+                <button class="tab-btn active" data-tab="tab-add-client">Add Client</button>
+                <button class="tab-btn" data-tab="tab-add-server">Add Server</button>
+            </div>
+
+
+            <!-- ── Tab: Add Client ───────────────────────────── -->
+            <div id="tab-add-client" class="tab-content active">
+                <div id="addClientResult" class="result-box" style="display:none;"></div>
+                <form id="addClientForm" autocomplete="off" novalidate>
+
+                    <div class="form-group">
+                        <label class="form-label">User ID</label>
+                        <input class="form-control" type="text" name="userId"
+                            maxlength="20" required placeholder="Unique client ID (max 20 chars)">
+                        <small class="form-hint">Existing userId will be updated.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Alias</label>
+                        <input class="form-control" type="text" name="alias"
+                            maxlength="30" required placeholder="Client alias (max 30 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Broker</label>
+                        <input class="form-control" type="text" name="Broker"
+                            maxlength="20" required placeholder="Broker name (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Algo</label>
+                        <input class="form-control" type="text" name="algo"
+                            maxlength="10" required placeholder="Algo type (max 10 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Running Type</label>
+                        <input class="form-control" type="text" name="Running Type"
+                            maxlength="20" required placeholder="Running type (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <input class="form-control" type="text" name="Category"
+                            maxlength="20" required placeholder="Category (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sub Category</label>
+                        <input class="form-control" type="text" name="SubCategory"
+                            maxlength="20" required placeholder="Sub category (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Acc Type</label>
+                        <input class="form-control" type="text" name="Acc Type"
+                            maxlength="20" required placeholder="Account type (max 20 chars)">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="addClientSubmitBtn">
+                        Save Client
+                    </button>
+                </form>
+            </div>
+
+
+            <!-- ── Tab: Add Server ───────────────────────────── -->
+            <div id="tab-add-server" class="tab-content">
+                <div id="addServerResult" class="result-box" style="display:none;"></div>
+                <form id="addServerForm" autocomplete="off" novalidate>
+
+                    <div class="form-group">
+                        <label class="form-label">Server</label>
+                        <input class="form-control" type="text" name="Server"
+                            maxlength="10" required placeholder="Server code (max 10 chars)">
+                        <small class="form-hint">Must be unique. Duplicates are not allowed.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input class="form-control" type="text" name="Username"
+                            maxlength="20" required placeholder="Login username (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">IP</label>
+                        <input class="form-control" type="text" name="IP"
+                            maxlength="20" required placeholder="Server IP address (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input class="form-control" type="text" name="Password"
+                            maxlength="30" required placeholder="Server password (max 30 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Stoxxo Id</label>
+                        <input class="form-control" type="text" name="Stoxxo Id"
+                            maxlength="30" required placeholder="Stoxxo ID (max 30 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Stoxxo Password</label>
+                        <input class="form-control" type="text" name="Stoxxo Password"
+                            maxlength="30" required placeholder="Stoxxo password (max 30 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Algo</label>
+                        <input class="form-control" type="text" name="Algo"
+                            maxlength="10" required placeholder="Algo type (max 10 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expiry</label>
+                        <input class="form-control" type="text" name="Expiry"
+                            maxlength="20" required placeholder="Expiry date (max 20 chars)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Subscriptions</label>
+                        <input class="form-control" type="number" name="Subscriptions"
+                            min="0" required placeholder="Total subscriptions">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Logins</label>
+                        <input class="form-control" type="number" name="Logins"
+                            min="0" required placeholder="Login count">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Active</label>
+                        <input class="form-control" type="number" name="Active"
+                            min="0" required placeholder="Active count">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Avlbl</label>
+                        <input class="form-control" type="number" name="Avlbl"
+                            min="0" required placeholder="Available slots">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="addServerSubmitBtn">
+                        Add Server
+                    </button>
+                </form>
+            </div>
+
+        </div>
+    </div>
+    <!-- end #adminPanelModal -->
+
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</body>
 
+    <script>
+    (function () {
+        "use strict";
+
+        var modal    = document.getElementById("adminPanelModal");
+        var openBtn  = document.getElementById("adminControlBtn");
+        var closeBtn = document.getElementById("adminPanelClose");
+
+        function openModal()  { modal.classList.add("active");    document.body.classList.add("modal-open"); }
+        function closeModal() { modal.classList.remove("active"); document.body.classList.remove("modal-open"); }
+
+        if (openBtn)  openBtn.addEventListener("click",   function(e){ e.preventDefault(); openModal(); });
+        closeBtn.addEventListener("click", closeModal);
+        modal.addEventListener("click",    function(e){ if (e.target === modal) closeModal(); });
+        document.addEventListener("keydown", function(e){ if (e.key === "Escape" && modal.classList.contains("active")) closeModal(); });
+
+        var tabBtns     = modal.querySelectorAll(".tab-btn");
+        var tabContents = modal.querySelectorAll(".tab-content");
+
+        tabBtns.forEach(function(btn) {
+            btn.addEventListener("click", function() {
+                tabBtns.forEach(function(b)     { b.classList.remove("active"); });
+                tabContents.forEach(function(c) { c.classList.remove("active"); });
+                btn.classList.add("active");
+                document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
+            });
+        });
+
+        function showResult(id, success, message) {
+            var box = document.getElementById(id);
+            if (!box) return;
+            box.style.display = "block";
+            box.className = "result-box " + (success ? "result-success" : "result-error");
+            box.innerHTML = "<strong>" + esc(message) + "</strong>";
+            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function hideResult(id) {
+            var box = document.getElementById(id);
+            if (box) { box.style.display = "none"; box.innerHTML = ""; }
+        }
+
+        function esc(t) {
+            var d = document.createElement("div");
+            d.appendChild(document.createTextNode(String(t)));
+            return d.innerHTML;
+        }
+
+        function setBtn(id, loading, label) {
+            var btn = document.getElementById(id);
+            if (!btn) return;
+            btn.disabled = loading; btn.textContent = label;
+        }
+
+        function bindForm(formId, url, submitBtnId, resultId, defaultLabel) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+            form.addEventListener("submit", function(e) {
+                e.preventDefault();
+                hideResult(resultId);
+                setBtn(submitBtnId, true, "Processing...");
+                fetch(url, { method: "POST", body: new FormData(form) })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        showResult(resultId, data.success, data.message || data.error);
+                        if (data.success) form.reset();
+                    })
+                    .catch(function() { showResult(resultId, false, "Network error. Please try again."); })
+                    .finally(function() { setBtn(submitBtnId, false, defaultLabel); });
+            });
+        }
+
+        bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
+        bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
+
+    }());
+    </script>
+
+</body>
 </html>

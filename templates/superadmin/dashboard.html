@@ -22,10 +22,7 @@
             </div>
 
             <div class="topbar-actions">
-
-                <button type="button" class="theme-toggle" data-theme-toggle>
-                    Dark Mode
-                </button>
+                <button type="button" class="theme-toggle" data-theme-toggle>Dark Mode</button>
 
                 <div class="settings-wrapper">
                     <button type="button" class="settings-btn" id="settingsButton">
@@ -35,69 +32,493 @@
 
                     <div class="settings-dropdown" id="settingsDropdown">
                         <div class="settings-dropdown-header">Settings</div>
-
                         <a href="#" class="settings-dropdown-item" id="adminControlBtn">
                             <span>◎</span>
                             <span>Admin Control</span>
                         </a>
-
                         <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
                             Log Out
                         </a>
                     </div>
                 </div>
-
             </div>
         </header>
 
-        <section class="page-container">
+        <div class="app-body">
 
-            <div class="page-header">
-                <h1 class="page-title">Welcome, {{ name }}</h1>
-                <p class="page-subtitle">
-                    Logged in as {{ role }} | {{ email }}
-                </p>
+            <!-- ── Sidebar ─────────────────────────────────────── -->
+            <nav class="sidebar">
+                <span class="sidebar-label">Navigation</span>
+                <a href="{{ url_for('superadmin_dashboard') }}" class="sidebar-item active">
+                    <span class="sidebar-icon">⊞</span>
+                    Dashboard
+                </a>
+                <a href="{{ url_for('superadmin_tables') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊟</span>
+                    Tables
+                </a>
+            </nav>
+
+            <!-- ── Main Content ───────────────────────────────── -->
+            <div class="main-content">
+                <section class="page-container">
+                    <div class="page-header">
+                        <h1 class="page-title">Welcome, {{ name }}</h1>
+                        <p class="page-subtitle">Logged in as {{ role }} | {{ email }}</p>
+                    </div>
+
+                    <div class="grid grid-4">
+                        <div class="card dashboard-card dashboard-card-purple">
+                            <div class="dashboard-card-icon">👑</div>
+                            <h2 class="card-title">Role Access</h2>
+                            <p class="card-subtitle">Superadmin control panel</p>
+                            <h3 class="dashboard-card-value">Full</h3>
+                        </div>
+                        <div class="card dashboard-card dashboard-card-blue">
+                            <div class="dashboard-card-icon">👥</div>
+                            <h2 class="card-title">Users</h2>
+                            <p class="card-subtitle">Role login users</p>
+                            <h3 class="dashboard-card-value">Active</h3>
+                        </div>
+                        <div class="card dashboard-card dashboard-card-green">
+                            <div class="dashboard-card-icon">🗄️</div>
+                            <h2 class="card-title">Database</h2>
+                            <p class="card-subtitle">CMP MySQL connected</p>
+                            <h3 class="dashboard-card-value">Online</h3>
+                        </div>
+                        <div class="card dashboard-card dashboard-card-orange">
+                            <div class="dashboard-card-icon">📊</div>
+                            <h2 class="card-title">Monitoring</h2>
+                            <p class="card-subtitle">Logs and app tracking</p>
+                            <h3 class="dashboard-card-value">Live</h3>
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            <div class="grid grid-4">
-
-                <div class="card dashboard-card dashboard-card-purple">
-                    <div class="dashboard-card-icon">👑</div>
-                    <h2 class="card-title">Role Access</h2>
-                    <p class="card-subtitle">Superadmin control panel</p>
-                    <h3 class="dashboard-card-value">Full</h3>
-                </div>
-
-                <div class="card dashboard-card dashboard-card-blue">
-                    <div class="dashboard-card-icon">👥</div>
-                    <h2 class="card-title">Users</h2>
-                    <p class="card-subtitle">Role login users</p>
-                    <h3 class="dashboard-card-value">Active</h3>
-                </div>
-
-                <div class="card dashboard-card dashboard-card-green">
-                    <div class="dashboard-card-icon">🗄️</div>
-                    <h2 class="card-title">Database</h2>
-                    <p class="card-subtitle">CMP MySQL connected</p>
-                    <h3 class="dashboard-card-value">Online</h3>
-                </div>
-
-                <div class="card dashboard-card dashboard-card-orange">
-                    <div class="dashboard-card-icon">📊</div>
-                    <h2 class="card-title">Monitoring</h2>
-                    <p class="card-subtitle">Logs and app tracking</p>
-                    <h3 class="dashboard-card-value">Live</h3>
-                </div>
-
-            </div>
-
-        </section>
-
+        </div>
     </main>
 
-    {% include 'partials/admin_panel_modal.html' %}
+
+    <!-- ============================================================ -->
+    <!-- ADMIN PANEL MODAL — SUPERADMIN                               -->
+    <!-- Tabs: Add User | Add Client | Add Server                     -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="adminPanelModal" role="dialog" aria-modal="true">
+        <div class="modal-box">
+
+            <div class="modal-header">
+                <h2 class="modal-title">Admin Panel</h2>
+                <button type="button" class="modal-close" id="adminPanelClose" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="modal-tabs" role="tablist">
+                <button class="tab-btn active" data-tab="tab-add-user">Add User</button>
+                <button class="tab-btn" data-tab="tab-add-client">Add Client</button>
+                <button class="tab-btn" data-tab="tab-add-server">Add Server</button>
+            </div>
+
+
+            <!-- ── Tab: Add User ─────────────────────────────── -->
+            <div id="tab-add-user" class="tab-content active">
+                <div id="addUserResult" class="result-box" style="display:none;"></div>
+                <form id="addUserForm" autocomplete="off" novalidate>
+
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select class="form-control" name="role" required>
+                            <option value="">Select role...</option>
+                            <option value="superadmin">Superadmin</option>
+                            <option value="admin">Admin</option>
+                            <option value="data">Data</option>
+                            <option value="operator">Operator</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input class="form-control" type="text" name="name"
+                            maxlength="30" required placeholder="Full name (max 30 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Ops Name</label>
+                        <input class="form-control" type="text" name="ops_name"
+                            maxlength="20" required placeholder="Short ops identifier (max 20 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" type="email" name="email"
+                            maxlength="30" required placeholder="user@megaserve.tech">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input class="form-control" type="text" name="password"
+                            maxlength="30" required placeholder="Set password (max 30 chars)">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="addUserSubmitBtn">
+                        Add User
+                    </button>
+                </form>
+            </div>
+
+
+            <!-- ── Tab: Add Client ───────────────────────────── -->
+            <div id="tab-add-client" class="tab-content">
+                <div class="upload-mode-btns">
+                    <button type="button" class="mode-btn active" data-mode="single">Single Add</button>
+                    <button type="button" class="mode-btn" data-mode="bulk">Bulk Upload</button>
+                </div>
+
+                <!-- Single -->
+                <div id="clientSingleSection">
+                    <div id="addClientResult" class="result-box" style="display:none;"></div>
+                    <form id="addClientForm" autocomplete="off" novalidate>
+
+                        <div class="form-group">
+                            <label class="form-label">User ID</label>
+                            <input class="form-control" type="text" name="userId"
+                                maxlength="20" required placeholder="Unique client ID (max 20 chars)">
+                            <small class="form-hint">Existing userId will be updated.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Alias</label>
+                            <input class="form-control" type="text" name="alias"
+                                maxlength="30" required placeholder="Client alias (max 30 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Broker</label>
+                            <input class="form-control" type="text" name="Broker"
+                                maxlength="20" required placeholder="Broker name (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Algo</label>
+                            <input class="form-control" type="text" name="algo"
+                                maxlength="10" required placeholder="Algo type (max 10 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Running Type</label>
+                            <input class="form-control" type="text" name="Running Type"
+                                maxlength="20" required placeholder="Running type (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category</label>
+                            <input class="form-control" type="text" name="Category"
+                                maxlength="20" required placeholder="Category (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Sub Category</label>
+                            <input class="form-control" type="text" name="SubCategory"
+                                maxlength="20" required placeholder="Sub category (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Acc Type</label>
+                            <input class="form-control" type="text" name="Acc Type"
+                                maxlength="20" required placeholder="Account type (max 20 chars)">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full" id="addClientSubmitBtn">
+                            Save Client
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Bulk -->
+                <div id="clientBulkSection" style="display:none;">
+                    <div id="bulkClientResult" class="result-box" style="display:none;"></div>
+                    <p class="text-muted" style="font-size:13px;margin-bottom:12px;line-height:1.6;">
+                        Upload an <strong>.xlsx</strong> file. The file must have the following columns
+                        as headers (exact names, same order):
+                    </p>
+                    <div class="bulk-columns-preview">
+                        <span>userId</span><span>alias</span><span>Broker</span><span>algo</span>
+                        <span>Running Type</span><span>Category</span>
+                        <span>SubCategory</span><span>Acc Type</span>
+                    </div>
+                    <p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+                        Existing <strong>userId</strong> records will be updated; new ones will be inserted.
+                    </p>
+                    <a href="/admin-panel/download-client-template" class="btn-link-download" download>
+                        ↓ Download Template
+                    </a>
+                    <form id="bulkClientForm" enctype="multipart/form-data" style="margin-top:16px;" novalidate>
+                        <div class="form-group">
+                            <label class="form-label">Upload .xlsx File</label>
+                            <input class="form-control" type="file" name="file" accept=".xlsx" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full" id="bulkClientSubmitBtn">
+                            Upload &amp; Process
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+
+            <!-- ── Tab: Add Server ───────────────────────────── -->
+            <div id="tab-add-server" class="tab-content">
+                <div class="upload-mode-btns">
+                    <button type="button" class="mode-btn active" data-mode="single">Single Add</button>
+                    <button type="button" class="mode-btn" data-mode="bulk">Bulk Upload</button>
+                </div>
+
+                <!-- Single -->
+                <div id="serverSingleSection">
+                    <div id="addServerResult" class="result-box" style="display:none;"></div>
+                    <form id="addServerForm" autocomplete="off" novalidate>
+
+                        <div class="form-group">
+                            <label class="form-label">Server</label>
+                            <input class="form-control" type="text" name="Server"
+                                maxlength="10" required placeholder="Server code (max 10 chars)">
+                            <small class="form-hint">Must be unique. Duplicates are not allowed.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Username</label>
+                            <input class="form-control" type="text" name="Username"
+                                maxlength="20" required placeholder="Login username (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">IP</label>
+                            <input class="form-control" type="text" name="IP"
+                                maxlength="20" required placeholder="Server IP address (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Password</label>
+                            <input class="form-control" type="text" name="Password"
+                                maxlength="30" required placeholder="Server password (max 30 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Stoxxo Id</label>
+                            <input class="form-control" type="text" name="Stoxxo Id"
+                                maxlength="30" required placeholder="Stoxxo ID (max 30 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Stoxxo Password</label>
+                            <input class="form-control" type="text" name="Stoxxo Password"
+                                maxlength="30" required placeholder="Stoxxo password (max 30 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Algo</label>
+                            <input class="form-control" type="text" name="Algo"
+                                maxlength="10" required placeholder="Algo type (max 10 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Expiry</label>
+                            <input class="form-control" type="text" name="Expiry"
+                                maxlength="20" required placeholder="Expiry date (max 20 chars)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Subscriptions</label>
+                            <input class="form-control" type="number" name="Subscriptions"
+                                min="0" required placeholder="Total subscriptions">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Logins</label>
+                            <input class="form-control" type="number" name="Logins"
+                                min="0" required placeholder="Login count">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Active</label>
+                            <input class="form-control" type="number" name="Active"
+                                min="0" required placeholder="Active count">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Avlbl</label>
+                            <input class="form-control" type="number" name="Avlbl"
+                                min="0" required placeholder="Available slots">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full" id="addServerSubmitBtn">
+                            Add Server
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Bulk -->
+                <div id="serverBulkSection" style="display:none;">
+                    <div id="bulkServerResult" class="result-box" style="display:none;"></div>
+                    <p class="text-muted" style="font-size:13px;margin-bottom:12px;line-height:1.6;">
+                        Upload an <strong>.xlsx</strong> file. The file must have the following columns
+                        as headers (exact names, same order):
+                    </p>
+                    <div class="bulk-columns-preview">
+                        <span>Server</span><span>Username</span><span>IP</span><span>Password</span>
+                        <span>Stoxxo Id</span><span>Stoxxo Password</span><span>Algo</span>
+                        <span>Expiry</span><span>Subscriptions</span><span>Logins</span>
+                        <span>Active</span><span>Avlbl</span>
+                    </div>
+                    <p class="text-muted" style="font-size:12px;margin-bottom:10px;">
+                        Only <strong>new</strong> servers are inserted. Rows where
+                        <strong>Server</strong> already exists will be skipped and reported.
+                    </p>
+                    <a href="/admin-panel/download-server-template" class="btn-link-download" download>
+                        ↓ Download Template
+                    </a>
+                    <form id="bulkServerForm" enctype="multipart/form-data" style="margin-top:16px;" novalidate>
+                        <div class="form-group">
+                            <label class="form-label">Upload .xlsx File</label>
+                            <input class="form-control" type="file" name="file" accept=".xlsx" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full" id="bulkServerSubmitBtn">
+                            Upload &amp; Process
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <!-- end #adminPanelModal -->
+
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-</body>
 
+    <script>
+    (function () {
+        "use strict";
+
+        var modal    = document.getElementById("adminPanelModal");
+        var openBtn  = document.getElementById("adminControlBtn");
+        var closeBtn = document.getElementById("adminPanelClose");
+
+        function openModal()  { modal.classList.add("active");    document.body.classList.add("modal-open"); }
+        function closeModal() { modal.classList.remove("active"); document.body.classList.remove("modal-open"); }
+
+        if (openBtn)  openBtn.addEventListener("click",   function(e){ e.preventDefault(); openModal(); });
+        closeBtn.addEventListener("click", closeModal);
+        modal.addEventListener("click",    function(e){ if (e.target === modal) closeModal(); });
+        document.addEventListener("keydown", function(e){ if (e.key === "Escape" && modal.classList.contains("active")) closeModal(); });
+
+        var tabBtns     = modal.querySelectorAll(".tab-btn");
+        var tabContents = modal.querySelectorAll(".tab-content");
+
+        tabBtns.forEach(function(btn) {
+            btn.addEventListener("click", function() {
+                tabBtns.forEach(function(b)     { b.classList.remove("active"); });
+                tabContents.forEach(function(c) { c.classList.remove("active"); });
+                btn.classList.add("active");
+                document.getElementById(btn.getAttribute("data-tab")).classList.add("active");
+            });
+        });
+
+        function initModeToggle(singleId, bulkId, resultIds) {
+            var parent   = (document.getElementById(singleId) || {}).parentNode;
+            if (!parent) return;
+            var modeBtns = parent.querySelectorAll(".mode-btn");
+            var single   = document.getElementById(singleId);
+            var bulk     = document.getElementById(bulkId);
+
+            modeBtns.forEach(function(btn) {
+                btn.addEventListener("click", function() {
+                    modeBtns.forEach(function(b) { b.classList.remove("active"); });
+                    btn.classList.add("active");
+                    if (btn.getAttribute("data-mode") === "single") {
+                        single.style.display = "block"; bulk.style.display = "none";
+                    } else {
+                        single.style.display = "none";  bulk.style.display = "block";
+                    }
+                    resultIds.forEach(function(id) { hideResult(id); });
+                });
+            });
+        }
+
+        initModeToggle("clientSingleSection", "clientBulkSection", ["addClientResult", "bulkClientResult"]);
+        initModeToggle("serverSingleSection", "serverBulkSection", ["addServerResult", "bulkServerResult"]);
+
+        function showResult(id, success, message, extras) {
+            var box = document.getElementById(id);
+            if (!box) return;
+            box.style.display = "block";
+            box.className = "result-box " + (success ? "result-success" : "result-error");
+            var html = "<strong>" + esc(message) + "</strong>";
+            if (extras && extras.length) {
+                html += "<ul class='result-list'>";
+                extras.forEach(function(l) { html += "<li>" + esc(l) + "</li>"; });
+                html += "</ul>";
+            }
+            box.innerHTML = html;
+            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function hideResult(id) {
+            var box = document.getElementById(id);
+            if (box) { box.style.display = "none"; box.innerHTML = ""; }
+        }
+
+        function esc(t) {
+            var d = document.createElement("div");
+            d.appendChild(document.createTextNode(String(t)));
+            return d.innerHTML;
+        }
+
+        function setBtn(id, loading, label) {
+            var btn = document.getElementById(id);
+            if (!btn) return;
+            btn.disabled = loading; btn.textContent = label;
+        }
+
+        function bindForm(formId, url, submitBtnId, resultId, defaultLabel, onData) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+            form.addEventListener("submit", function(e) {
+                e.preventDefault();
+                hideResult(resultId);
+                var fi = form.querySelector("input[type='file']");
+                if (fi && (!fi.files || !fi.files.length)) {
+                    showResult(resultId, false, "Please select a file to upload.");
+                    return;
+                }
+                setBtn(submitBtnId, true, "Processing...");
+                fetch(url, { method: "POST", body: new FormData(form) })
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (onData) { onData(data, resultId, form); }
+                        else {
+                            showResult(resultId, data.success, data.message || data.error);
+                            if (data.success) form.reset();
+                        }
+                    })
+                    .catch(function() { showResult(resultId, false, "Network error. Please try again."); })
+                    .finally(function() { setBtn(submitBtnId, false, defaultLabel); });
+            });
+        }
+
+        bindForm("addUserForm",   "/admin-panel/add-user",   "addUserSubmitBtn",   "addUserResult",   "Add User");
+        bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
+        bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
+
+        bindForm("bulkClientForm", "/admin-panel/bulk-upload-clients", "bulkClientSubmitBtn", "bulkClientResult", "Upload & Process",
+            function(data, rid, form) {
+                if (!data.success) { showResult(rid, false, data.error || "Upload failed."); return; }
+                var extras = [];
+                (data.errors || []).forEach(function(e) {
+                    extras.push("Row " + e.row + (e.userId ? " (userId: " + e.userId + ")" : "") + ": " + e.error);
+                });
+                showResult(rid, true, data.message, extras);
+                form.reset();
+            }
+        );
+
+        bindForm("bulkServerForm", "/admin-panel/bulk-upload-servers", "bulkServerSubmitBtn", "bulkServerResult", "Upload & Process",
+            function(data, rid, form) {
+                if (!data.success) { showResult(rid, false, data.error || "Upload failed."); return; }
+                var extras = [];
+                (data.skipped || []).forEach(function(s) {
+                    extras.push("Row " + s.row + (s.Server ? " (Server: " + s.Server + ")" : "") + " — " + s.reason);
+                });
+                (data.errors || []).forEach(function(e) {
+                    extras.push("Row " + e.row + (e.Server ? " (Server: " + e.Server + ")" : "") + ": " + e.error);
+                });
+                showResult(rid, true, data.message, extras);
+                form.reset();
+            }
+        );
+
+    }());
+    </script>
+
+</body>
 </html>

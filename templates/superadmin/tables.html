@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tables | CMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <main class="app-page">
+
+        <header class="topbar">
+            <div class="topbar-brand">
+                <div class="topbar-logo">C</div>
+                <div>
+                    <div class="topbar-title">CMP Operation App</div>
+                    <small class="text-muted">Tables</small>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button type="button" class="theme-toggle" data-theme-toggle>Dark Mode</button>
+
+                <div class="settings-wrapper">
+                    <button type="button" class="settings-btn" id="settingsButton">
+                        <span class="settings-icon">⚙</span>
+                        <span>Settings</span>
+                    </button>
+
+                    <div class="settings-dropdown" id="settingsDropdown">
+                        <div class="settings-dropdown-header">Settings</div>
+                        <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
+                            Log Out
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="app-body">
+
+            <!-- ── Sidebar ───────────────────────────────────── -->
+            <nav class="sidebar">
+                <span class="sidebar-label">Navigation</span>
+                <a href="{{ url_for('superadmin_dashboard') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊞</span>
+                    Dashboard
+                </a>
+                <a href="{{ url_for('superadmin_tables') }}" class="sidebar-item active">
+                    <span class="sidebar-icon">⊟</span>
+                    Tables
+                </a>
+            </nav>
+
+            <!-- ── Main Content ──────────────────────────────── -->
+            <div class="main-content">
+
+                <!-- Tab nav -->
+                <div class="tables-nav">
+                    <button class="tables-nav-btn active" data-target="tab-client">Client</button>
+                    <button class="tables-nav-btn" data-target="tab-server-config">Server Config</button>
+                    <button class="tables-nav-btn" data-target="tab-server-mapping">Server Mapping</button>
+                </div>
+
+                <!-- ── Client tab ────────────────────────────── -->
+                <div id="tab-client" class="tables-tab-content active">
+                    <div class="tables-header">
+                        <h2>Clients</h2>
+                        <span class="tables-record-count" id="clientCount">Loading…</span>
+                    </div>
+                    <div id="clientTableArea">
+                        <div class="table-loading">Loading client data…</div>
+                    </div>
+                </div>
+
+                <!-- ── Server Config tab ─────────────────────── -->
+                <div id="tab-server-config" class="tables-tab-content">
+                    <div class="tables-header">
+                        <h2>Server Config</h2>
+                        <span class="tables-record-count" id="serverCount"></span>
+                    </div>
+                    <div id="serverTableArea">
+                        <div class="table-loading">Click the tab to load server data…</div>
+                    </div>
+                </div>
+
+                <!-- ── Server Mapping tab ────────────────────── -->
+                <div id="tab-server-mapping" class="tables-tab-content">
+                    <div class="tables-header"><h2>Server Mapping</h2></div>
+                    <div class="table-empty">Coming soon.</div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <script>
+    (function () {
+        "use strict";
+
+        // ── Shared utilities ──────────────────────────────────────
+        function esc(t) {
+            var d = document.createElement("div");
+            d.appendChild(document.createTextNode(String(t == null ? "" : t)));
+            return d.innerHTML;
+        }
+
+        function flashCell(td) {
+            td.classList.remove("cell-saved");
+            void td.offsetWidth;
+            td.classList.add("cell-saved");
+        }
+
+        // ── Tab navigation ────────────────────────────────────────
+        var navBtns  = document.querySelectorAll(".tables-nav-btn");
+        var tabPanes = document.querySelectorAll(".tables-tab-content");
+
+        navBtns.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                navBtns.forEach(function (b)  { b.classList.remove("active"); });
+                tabPanes.forEach(function (p) { p.classList.remove("active"); });
+                btn.classList.add("active");
+                var pane = document.getElementById(btn.getAttribute("data-target"));
+                pane.classList.add("active");
+
+                // Lazy-load server config on first open
+                if (btn.getAttribute("data-target") === "tab-server-config" && !serverLoaded) {
+                    loadServerConfig();
+                }
+            });
+        });
+
+        // ── Generic InlineTable factory ───────────────────────────
+        //
+        // config {
+        //   areaId      : string   — container div id
+        //   countId     : string   — record count badge id
+        //   pkField     : string   — primary-key column (identifies row in update call)
+        //   pkParam     : string   — form field name sent to backend for the PK value
+        //   apiUpdate   : string   — POST URL for update-field
+        //   columns     : string[] — ordered list of columns to display
+        //   editable    : object   — { colName: { type:"text"|"number"|"select", maxlength?, options? } }
+        //   readonlyAuto: string[] — columns shown read-only (italics), not double-clickable
+        //   onAfterSave : fn(td, col, newVal, data, tr)  — optional hook for side effects
+        // }
+
+        function InlineTable(config) {
+            var rowsData = [];
+
+            function show(html) {
+                document.getElementById(config.areaId).innerHTML = html;
+            }
+
+            function setCount(n) {
+                var el = document.getElementById(config.countId);
+                if (el) el.textContent = n + " record" + (n !== 1 ? "s" : "");
+            }
+
+            this.render = function (rows) {
+                rowsData = rows;
+                setCount(rows.length);
+
+                if (!rows.length) {
+                    show("<div class='table-empty'>No records found.</div>");
+                    return;
+                }
+
+                var html = "<div class='data-table-wrapper'><table class='data-table'><thead><tr>";
+                config.columns.forEach(function (col) { html += "<th>" + esc(col) + "</th>"; });
+                html += "</tr></thead><tbody>";
+
+                rows.forEach(function (row) {
+                    var pk = String(row[config.pkField] || "");
+                    html += "<tr data-pk='" + esc(pk) + "'>";
+
+                    config.columns.forEach(function (col) {
+                        var val = row[col] !== undefined ? String(row[col]) : "";
+
+                        if (config.readonlyAuto && config.readonlyAuto.indexOf(col) !== -1) {
+                            html += "<td class='cell-readonly' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + esc(val) + "</td>";
+                        } else if (config.editable && config.editable[col]) {
+                            html += "<td class='cell-editable' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + esc(val) + "</td>";
+                        } else {
+                            // PK or non-editable column
+                            html += "<td data-col='" + esc(col) + "'>" + esc(val) + "</td>";
+                        }
+                    });
+
+                    html += "</tr>";
+                });
+
+                html += "</tbody></table></div>";
+                show(html);
+
+                // Attach double-click listeners
+                document.querySelectorAll("#" + config.areaId + " td.cell-editable").forEach(function (td) {
+                    td.addEventListener("dblclick", function () { startEdit(td); });
+                });
+            };
+
+            function startEdit(td) {
+                if (td.classList.contains("cell-editing")) return;
+
+                var col    = td.getAttribute("data-col");
+                var val    = td.getAttribute("data-val") || td.textContent.trim();
+                var cfg    = config.editable[col];
+                if (!cfg) return;
+
+                td.classList.add("cell-editing");
+                td.innerHTML = "";
+
+                var input;
+
+                if (cfg.type === "select") {
+                    input = document.createElement("select");
+                    input.className = "cell-edit-select";
+                    var blank = document.createElement("option");
+                    blank.value = ""; blank.textContent = "— select —";
+                    input.appendChild(blank);
+                    (cfg.options || []).forEach(function (opt) {
+                        var o = document.createElement("option");
+                        o.value = opt; o.textContent = opt;
+                        if (opt === val) o.selected = true;
+                        input.appendChild(o);
+                    });
+                } else {
+                    input = document.createElement("input");
+                    input.type  = cfg.type === "number" ? "number" : "text";
+                    input.className = "cell-edit-input";
+                    input.value = val;
+                    if (cfg.maxlength) input.maxLength = cfg.maxlength;
+                    if (cfg.type === "number") { input.min = "0"; input.style.width = "80px"; }
+                }
+
+                td.appendChild(input);
+                input.focus();
+                if (input.select) input.select();
+
+                function commit() {
+                    var newVal = input.value.trim();
+                    if (newVal === val) { cancelEdit(td, col, val); return; }
+                    saveField(td, col, newVal, val);
+                }
+
+                input.addEventListener("blur", commit);
+                input.addEventListener("keydown", function (e) {
+                    if (e.key === "Enter")  { input.blur(); }
+                    if (e.key === "Escape") { cancelEdit(td, col, val); }
+                });
+            }
+
+            function cancelEdit(td, col, originalVal) {
+                td.classList.remove("cell-editing");
+                td.setAttribute("data-val", originalVal);
+                td.textContent = originalVal;
+            }
+
+            function saveField(td, col, newVal, originalVal) {
+                var tr = td.closest("tr");
+                var pk = tr ? tr.getAttribute("data-pk") : "";
+                if (!pk) { cancelEdit(td, col, originalVal); return; }
+
+                var fd = new FormData();
+                fd.append(config.pkParam, pk);
+                fd.append("field",        col);
+                fd.append("value",        newVal);
+
+                fetch(config.apiUpdate, { method: "POST", body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            td.classList.remove("cell-editing");
+                            td.setAttribute("data-val", newVal);
+                            td.textContent = newVal;
+                            flashCell(td);
+
+                            // Update in-memory cache
+                            rowsData.forEach(function (row) {
+                                if (String(row[config.pkField]) === pk) {
+                                    row[col] = newVal;
+                                }
+                            });
+
+                            if (config.onAfterSave) {
+                                config.onAfterSave(td, col, newVal, data, tr);
+                            }
+                        } else {
+                            alert(data.error || "Could not save change.");
+                            cancelEdit(td, col, originalVal);
+                        }
+                    })
+                    .catch(function () {
+                        alert("Network error. Could not save change.");
+                        cancelEdit(td, col, originalVal);
+                    });
+            }
+        }
+
+        // ── Client table ──────────────────────────────────────────
+        var serverOperatorMap = {};
+
+        var clientTable = new InlineTable({
+            areaId:    "clientTableArea",
+            countId:   "clientCount",
+            pkField:   "userId",
+            pkParam:   "userId",
+            apiUpdate: "/api/clients/update-field",
+            columns: [
+                "userId", "alias", "Broker", "server",
+                "algo", "Running Type", "Operator Name",
+                "Category", "SubCategory", "Acc Type"
+            ],
+            editable: {
+                "alias":        { type: "text",   maxlength: 30 },
+                "server":       { type: "select", options: [] },
+                "algo":         { type: "text",   maxlength: 10 },
+                "Running Type": { type: "select", options: ["INT", "POS"] },
+                "Acc Type":     { type: "select", options: [
+                    "Client", "PS_Personal", "RD_Personal", "VT_Personal", "GB_Personal"
+                ]}
+            },
+            readonlyAuto: ["Operator Name"],
+            onAfterSave: function (td, col, newVal, data, tr) {
+                // When server changes, sync Operator Name cell
+                if (col === "server" && data.operator_name !== undefined && data.operator_name !== null) {
+                    var opTd = tr.querySelector("td[data-col='Operator Name']");
+                    if (opTd) {
+                        opTd.setAttribute("data-val", data.operator_name);
+                        opTd.textContent = data.operator_name;
+                        flashCell(opTd);
+                    }
+                }
+            }
+        });
+
+        // ── Server Config table ───────────────────────────────────
+        var serverLoaded = false;
+
+        var serverConfigTable = new InlineTable({
+            areaId:    "serverTableArea",
+            countId:   "serverCount",
+            pkField:   "Server",
+            pkParam:   "server",
+            apiUpdate: "/api/server-info/update-field",
+            columns: [
+                "Server", "Username", "IP", "Password",
+                "Stoxxo Id", "Stoxxo Password", "Algo", "Expiry",
+                "Subscriptions", "Logins", "Active", "Avlbl",
+                "Dte", "Aum", "Remarks", "Operator", "Stoxxo URL"
+            ],
+            editable: {
+                "Username":       { type: "text",   maxlength: 20 },
+                "IP":             { type: "text",   maxlength: 20 },
+                "Password":       { type: "text",   maxlength: 30 },
+                "Stoxxo Id":      { type: "text",   maxlength: 30 },
+                "Stoxxo Password":{ type: "text",   maxlength: 30 },
+                "Algo":           { type: "text",   maxlength: 10 },
+                "Expiry":         { type: "text",   maxlength: 20 },
+                "Subscriptions":  { type: "number" },
+                "Logins":         { type: "number" },
+                "Active":         { type: "number" },
+                "Avlbl":          { type: "number" },
+                "Dte":            { type: "text",   maxlength: 20 },
+                "Aum":            { type: "text",   maxlength: 20 },
+                "Remarks":        { type: "text",   maxlength: 200 },
+                "Operator":       { type: "text",   maxlength: 30 },
+                "Stoxxo URL":     { type: "text",   maxlength: 100 }
+            }
+            // Server (PK) is not in editable → rendered as plain td, not double-clickable
+        });
+
+        function loadServerConfig() {
+            document.getElementById("serverTableArea").innerHTML =
+                "<div class='table-loading'>Loading server data…</div>";
+
+            fetch("/api/server-info")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.success) {
+                        document.getElementById("serverTableArea").innerHTML =
+                            "<div class='table-error'>" + esc(data.error || "Could not load data.") + "</div>";
+                        return;
+                    }
+                    serverLoaded = true;
+                    serverConfigTable.render(data.servers || []);
+                })
+                .catch(function () {
+                    document.getElementById("serverTableArea").innerHTML =
+                        "<div class='table-error'>Network error. Could not load server data.</div>";
+                });
+        }
+
+        // ── Load client table on page open ────────────────────────
+        (function initClientTab() {
+            Promise.all([
+                fetch("/api/clients").then(function (r) { return r.json(); }),
+                fetch("/api/servers").then(function (r) { return r.json(); })
+            ]).then(function (results) {
+                var cRes = results[0];
+                var sRes = results[1];
+
+                if (!cRes.success) {
+                    document.getElementById("clientTableArea").innerHTML =
+                        "<div class='table-error'>" + esc(cRes.error || "Could not load clients.") + "</div>";
+                    document.getElementById("clientCount").textContent = "Error";
+                    return;
+                }
+
+                // Build server dropdown options + operator map
+                if (sRes.success && sRes.servers) {
+                    sRes.servers.forEach(function (s) {
+                        serverOperatorMap[s.Server] = s.Operator || "";
+                    });
+                    // Inject server options into clientTable editable config
+                    clientTable.config = clientTable.config || {};
+                }
+
+                // Patch server options before render (access via closure over clientTable)
+                var serverNames = (sRes.success && sRes.servers)
+                    ? sRes.servers.map(function (s) { return s.Server; })
+                    : [];
+
+                // Re-create with populated options
+                clientTable = new InlineTable({
+                    areaId:    "clientTableArea",
+                    countId:   "clientCount",
+                    pkField:   "userId",
+                    pkParam:   "userId",
+                    apiUpdate: "/api/clients/update-field",
+                    columns: [
+                        "userId", "alias", "Broker", "server",
+                        "algo", "Running Type", "Operator Name",
+                        "Category", "SubCategory", "Acc Type"
+                    ],
+                    editable: {
+                        "alias":        { type: "text",   maxlength: 30 },
+                        "server":       { type: "select", options: serverNames },
+                        "algo":         { type: "text",   maxlength: 10 },
+                        "Running Type": { type: "select", options: ["INT", "POS"] },
+                        "Acc Type":     { type: "select", options: [
+                            "Client", "PS_Personal", "RD_Personal", "VT_Personal", "GB_Personal"
+                        ]}
+                    },
+                    readonlyAuto: ["Operator Name"],
+                    onAfterSave: function (td, col, newVal, data, tr) {
+                        if (col === "server" && data.operator_name !== undefined && data.operator_name !== null) {
+                            var opTd = tr.querySelector("td[data-col='Operator Name']");
+                            if (opTd) {
+                                opTd.setAttribute("data-val", data.operator_name);
+                                opTd.textContent = data.operator_name;
+                                flashCell(opTd);
+                            }
+                        }
+                    }
+                });
+
+                clientTable.render(cRes.clients || []);
+
+            }).catch(function () {
+                document.getElementById("clientTableArea").innerHTML =
+                    "<div class='table-error'>Network error. Could not load client data.</div>";
+                document.getElementById("clientCount").textContent = "Error";
+            });
+        }());
+
+    }());
+    </script>
+
+</body>
+</html>

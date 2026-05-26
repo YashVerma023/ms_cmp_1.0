@@ -10,23 +10,17 @@ Responsibilities:
 4. Redirect user to role-based dashboard
 5. All four role dashboards are wired and active
 6. Admin panel API routes (superadmin + admin only):
-   - Add user to role_login
-   - Add / upsert client to clients table
-   - Bulk upsert clients from .xlsx file
-   - Download .xlsx client upload template
+   - Add user to role_login            (superadmin only)
+   - Add / upsert client in clients    (superadmin + admin)
+   - Bulk upsert clients from .xlsx    (superadmin + admin)
+   - Add server to server_info         (superadmin + admin)
+   - Bulk insert servers from .xlsx    (superadmin + admin, skips duplicates)
+   - Download .xlsx templates
 
-Login source table:
-    role_login
-
-Login fields:
-    email, password
-
-Supported roles:
-    superadmin, admin, data, operator
-
-Admin Panel access:
-    superadmin — can add users of any role
-    admin      — can add data and operator users only
+Login source table : role_login
+Login fields       : email, password
+Supported roles    : superadmin, admin, data, operator
+Admin Panel access : superadmin, admin
 """
 
 from __future__ import annotations
@@ -77,14 +71,15 @@ app.secret_key = os.getenv(
 VALID_ROLES: frozenset[str] = frozenset({"superadmin", "admin", "data", "operator"})
 ADMIN_PANEL_ROLES: frozenset[str] = frozenset({"superadmin", "admin"})
 
-# Client columns visible in form and bulk upload (excludes 'server')
+# ── Client ────────────────────────────────────────────────────────────────────
+
+# Client columns in form and bulk upload (excludes 'server')
 CLIENT_FORM_COLUMNS: list[str] = [
     "userId",
     "alias",
     "Broker",
     "algo",
     "Running Type",
-    "Operator Name",
     "Category",
     "SubCategory",
     "Acc Type",
@@ -96,11 +91,46 @@ CLIENT_MAX_LENGTHS: dict[str, int] = {
     "Broker": 20,
     "algo": 10,
     "Running Type": 20,
-    "Operator Name": 20,
     "Category": 20,
     "SubCategory": 20,
     "Acc Type": 20,
 }
+
+# ── Server ────────────────────────────────────────────────────────────────────
+
+# Server columns in form and bulk upload.
+# Excludes: Dte, Aum, Remarks, Operator, Stoxxo URL
+SERVER_FORM_COLUMNS: list[str] = [
+    "Server",
+    "Username",
+    "IP",
+    "Password",
+    "Stoxxo Id",
+    "Stoxxo Password",
+    "Algo",
+    "Expiry",
+    "Subscriptions",
+    "Logins",
+    "Active",
+    "Avlbl",
+]
+
+# INT-typed server columns — validated as non-negative integers
+SERVER_INT_COLUMNS: frozenset[str] = frozenset({"Subscriptions", "Logins", "Active", "Avlbl"})
+
+# VARCHAR server columns with max lengths
+SERVER_VARCHAR_MAX_LENGTHS: dict[str, int] = {
+    "Server": 10,
+    "Username": 20,
+    "IP": 20,
+    "Password": 30,
+    "Stoxxo Id": 30,
+    "Stoxxo Password": 30,
+    "Algo": 10,
+    "Expiry": 20,
+}
+
+# ── Role Login ────────────────────────────────────────────────────────────────
 
 ROLE_LOGIN_MAX_LENGTHS: dict[str, int] = {
     "role": 20,
@@ -116,9 +146,7 @@ ROLE_LOGIN_MAX_LENGTHS: dict[str, int] = {
 # =========================
 
 def get_mysql_config() -> dict:
-    """
-    Reads MySQL configuration from environment variables.
-    """
+    """Reads MySQL configuration from environment variables."""
 
     mysql_port_raw = os.getenv("MYSQL_PORT", "3306")
 
@@ -139,7 +167,7 @@ def get_mysql_config() -> dict:
 def get_db_connection() -> pymysql.connections.Connection:
     """
     Creates and returns a MySQL database connection.
-    Caller is responsible for closing the connection.
+    Caller is responsible for closing it.
     """
 
     config = get_mysql_config()
@@ -161,23 +189,10 @@ def get_db_connection() -> pymysql.connections.Connection:
 # =========================
 
 def get_user_by_email(email: str) -> Optional[dict]:
-    """
-    Fetches user row from role_login table by email.
-
-    Args:
-        email: login email address
-
-    Returns:
-        User dict if found, else None.
-    """
+    """Fetches a user row from role_login by email."""
 
     query = """
-        SELECT
-            role,
-            name,
-            ops_name,
-            email,
-            password
+        SELECT role, name, ops_name, email, password
         FROM role_login
         WHERE email = %s
         LIMIT 1
@@ -194,14 +209,11 @@ def get_user_by_email(email: str) -> Optional[dict]:
 
 
 def is_valid_role(role: str) -> bool:
-    """Returns True if role is in the allowed set."""
     return role in VALID_ROLES
 
 
 def login_required(view_func: Callable) -> Callable:
-    """
-    Decorator: redirects unauthenticated users to login page.
-    """
+    """Decorator: redirects unauthenticated users to login."""
 
     @wraps(view_func)
     def wrapper(*args, **kwargs):
@@ -219,10 +231,7 @@ def login_required(view_func: Callable) -> Callable:
 
 
 def role_required(required_role: str) -> Callable:
-    """
-    Decorator: returns HTTP 403 HTML if session role does not match.
-    Use for page routes only.
-    """
+    """Decorator: returns HTTP 403 HTML page if role does not match."""
 
     def decorator(view_func: Callable) -> Callable:
         @wraps(view_func)
@@ -252,20 +261,14 @@ def role_required(required_role: str) -> Callable:
 
 
 def redirect_user_by_role(role: str):
-    """
-    Redirects authenticated user to their role-specific dashboard.
-    All four roles are now fully wired.
-    """
+    """Redirects authenticated user to their role-specific dashboard."""
 
     if role == "superadmin":
         return redirect(url_for("superadmin_dashboard"))
-
     if role == "admin":
         return redirect(url_for("admin_dashboard"))
-
     if role == "data":
         return redirect(url_for("data_dashboard"))
-
     if role == "operator":
         return redirect(url_for("operator_dashboard"))
 
@@ -278,7 +281,7 @@ def redirect_user_by_role(role: str):
 
 def check_admin_panel_access() -> Optional[tuple]:
     """
-    Validates that the current session role has admin panel access.
+    Checks if the current session role has admin panel access.
 
     Returns:
         None if access is granted.
@@ -293,32 +296,23 @@ def check_admin_panel_access() -> Optional[tuple]:
 
 def get_allowed_new_roles(current_role: str) -> list[str]:
     """
-    Returns the list of roles this user is allowed to assign when adding a new user.
-
-    superadmin: can assign superadmin, admin, data, operator
-    admin:      can assign data, operator only
+    Returns roles this user may assign when adding a new user.
+    superadmin: all four roles.
+    admin: data and operator only.
     """
 
     if current_role == "superadmin":
         return ["superadmin", "admin", "data", "operator"]
-
     if current_role == "admin":
         return ["data", "operator"]
-
     return []
 
 
-def validate_string_field(
-    value: str,
-    field_name: str,
-    max_length: int,
-) -> Optional[str]:
+def validate_string_field(value: str, field_name: str, max_length: int) -> Optional[str]:
     """
     Validates a required string field against max length.
 
-    Returns:
-        None if valid.
-        Error message string if invalid.
+    Returns None if valid, or an error message string.
     """
 
     stripped = str(value).strip()
@@ -344,18 +338,12 @@ def user_exists_by_ops_name_or_email(
     ops_name: str,
     email: str,
 ) -> Optional[dict]:
-    """
-    Checks whether a user with the given ops_name or email already exists.
-
-    Returns:
-        Matching row dict if found, else None.
-    """
+    """Returns a matching row if ops_name or email already exists, else None."""
 
     query = """
         SELECT ops_name, email
         FROM role_login
-        WHERE ops_name = %s
-           OR email = %s
+        WHERE ops_name = %s OR email = %s
         LIMIT 1
     """
 
@@ -368,9 +356,7 @@ def insert_role_login_user(
     connection: pymysql.connections.Connection,
     user_data: dict,
 ) -> None:
-    """
-    Inserts a new user row into the role_login table.
-    """
+    """Inserts a new user into role_login."""
 
     query = """
         INSERT INTO role_login (role, name, ops_name, email, password)
@@ -397,16 +383,9 @@ def client_exists_by_user_id(
     connection: pymysql.connections.Connection,
     user_id: str,
 ) -> bool:
-    """
-    Returns True if a client with the given userId already exists.
-    """
+    """Returns True if a client with the given userId already exists."""
 
-    query = """
-        SELECT userId
-        FROM clients
-        WHERE userId = %s
-        LIMIT 1
-    """
+    query = "SELECT userId FROM clients WHERE userId = %s LIMIT 1"
 
     with connection.cursor() as cursor:
         cursor.execute(query, (user_id,))
@@ -417,16 +396,13 @@ def insert_client(
     connection: pymysql.connections.Connection,
     client_data: dict,
 ) -> None:
-    """
-    Inserts a new client row into the clients table.
-    """
+    """Inserts a new client row."""
 
     query = """
         INSERT INTO clients
             (userId, alias, Broker, algo, `Running Type`, `Operator Name`,
              Category, SubCategory, `Acc Type`)
-        VALUES
-            (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     values = (
@@ -435,7 +411,7 @@ def insert_client(
         str(client_data.get("Broker", "")).strip(),
         str(client_data.get("algo", "")).strip(),
         str(client_data.get("Running Type", "")).strip(),
-        str(client_data.get("Operator Name", "")).strip(),
+        "",  # Operator Name: system-assigned via server mapping, not set on add
         str(client_data.get("Category", "")).strip(),
         str(client_data.get("SubCategory", "")).strip(),
         str(client_data.get("Acc Type", "")).strip(),
@@ -449,9 +425,7 @@ def update_client(
     connection: pymysql.connections.Connection,
     client_data: dict,
 ) -> None:
-    """
-    Updates an existing client row identified by userId.
-    """
+    """Updates an existing client row identified by userId."""
 
     query = """
         UPDATE clients
@@ -460,19 +434,19 @@ def update_client(
             Broker         = %s,
             algo           = %s,
             `Running Type`   = %s,
-            `Operator Name`  = %s,
             Category       = %s,
             SubCategory    = %s,
             `Acc Type`       = %s
         WHERE userId = %s
     """
+    # Note: Operator Name is NOT updated here — it is system-managed
+    # via the server mapping (Tables UI → server dropdown → auto-sync).
 
     values = (
         str(client_data.get("alias", "")).strip(),
         str(client_data.get("Broker", "")).strip(),
         str(client_data.get("algo", "")).strip(),
         str(client_data.get("Running Type", "")).strip(),
-        str(client_data.get("Operator Name", "")).strip(),
         str(client_data.get("Category", "")).strip(),
         str(client_data.get("SubCategory", "")).strip(),
         str(client_data.get("Acc Type", "")).strip(),
@@ -489,10 +463,7 @@ def upsert_client(
 ) -> str:
     """
     Inserts or updates a client by userId.
-
-    Returns:
-        "inserted" — new client was created.
-        "updated"  — existing client was updated.
+    Returns "inserted" or "updated".
     """
 
     user_id = str(client_data.get("userId", "")).strip()
@@ -507,11 +478,7 @@ def upsert_client(
 
 def validate_client_data(client_data: dict) -> Optional[str]:
     """
-    Validates all required client fields against schema constraints.
-
-    Returns:
-        None if all fields are valid.
-        First encountered error message string if any field is invalid.
+    Validates all client fields. Returns None if valid, else first error message.
     """
 
     for field, max_len in CLIENT_MAX_LENGTHS.items():
@@ -527,25 +494,100 @@ def validate_client_data(client_data: dict) -> Optional[str]:
 
 
 # =========================
+# DB: Server Operations
+# =========================
+
+def server_exists_by_name(
+    connection: pymysql.connections.Connection,
+    server_name: str,
+) -> bool:
+    """Returns True if a server_info row with the given Server name exists."""
+
+    query = "SELECT Server FROM server_info WHERE Server = %s LIMIT 1"
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, (server_name,))
+        return cursor.fetchone() is not None
+
+
+def insert_server(
+    connection: pymysql.connections.Connection,
+    server_data: dict,
+) -> None:
+    """Inserts a new row into server_info (form-exposed columns only)."""
+
+    query = """
+        INSERT INTO server_info
+            (Server, Username, IP, Password, `Stoxxo Id`, `Stoxxo Password`,
+             Algo, Expiry, Subscriptions, Logins, Active, Avlbl)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+
+    values = (
+        str(server_data.get("Server", "")).strip(),
+        str(server_data.get("Username", "")).strip(),
+        str(server_data.get("IP", "")).strip(),
+        str(server_data.get("Password", "")).strip(),
+        str(server_data.get("Stoxxo Id", "")).strip(),
+        str(server_data.get("Stoxxo Password", "")).strip(),
+        str(server_data.get("Algo", "")).strip(),
+        str(server_data.get("Expiry", "")).strip(),
+        int(server_data.get("Subscriptions", 0)),
+        int(server_data.get("Logins", 0)),
+        int(server_data.get("Active", 0)),
+        int(server_data.get("Avlbl", 0)),
+    )
+
+    with connection.cursor() as cursor:
+        cursor.execute(query, values)
+
+
+def validate_server_data(server_data: dict) -> Optional[str]:
+    """
+    Validates all server form fields.
+    VARCHAR fields: required + max length.
+    INT fields: required + valid non-negative integer.
+    Returns None if valid, else first error message.
+    """
+
+    for field, max_len in SERVER_VARCHAR_MAX_LENGTHS.items():
+        error_msg = validate_string_field(
+            value=str(server_data.get(field, "")),
+            field_name=field,
+            max_length=max_len,
+        )
+        if error_msg:
+            return error_msg
+
+    for field in SERVER_INT_COLUMNS:
+        raw_value = str(server_data.get(field, "")).strip()
+
+        if not raw_value:
+            return f"Field '{field}' is required."
+
+        try:
+            int_value = int(raw_value)
+            if int_value < 0:
+                return f"Field '{field}' must be a non-negative integer."
+        except ValueError:
+            return f"Field '{field}' must be a valid integer (got: '{raw_value}')."
+
+    return None
+
+
+# =========================
 # Routes: Public
 # =========================
 
 @app.route("/", methods=["GET"])
 def index():
-    """
-    Root route.
-    Redirects logged-in users to their dashboard, otherwise shows login.
-    """
+    """Root route: redirect to dashboard if logged in, else show login."""
 
     if session.get("is_logged_in"):
         return redirect_user_by_role(session.get("role", ""))
 
-    log_info(
-        module=MODULE_NAME,
-        action="index",
-        message="Login page requested from root URL",
-        status="SUCCESS",
-    )
+    log_info(module=MODULE_NAME, action="index",
+             message="Login page requested from root URL", status="SUCCESS")
 
     return render_template("login.html")
 
@@ -553,126 +595,76 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     """
-    Login route.
-
-    GET:  Show login page (redirect to dashboard if already logged in).
-    POST: Authenticate email/password against role_login table.
+    GET:  Show login page (redirect if already logged in).
+    POST: Authenticate email/password against role_login.
     """
 
     if request.method == "GET":
         if session.get("is_logged_in"):
             return redirect_user_by_role(session.get("role", ""))
 
-        log_info(
-            module=MODULE_NAME,
-            action="login_get",
-            message="Login page requested",
-            status="SUCCESS",
-        )
-
+        log_info(module=MODULE_NAME, action="login_get",
+                 message="Login page requested", status="SUCCESS")
         return render_template("login.html")
 
     try:
-        email = request.form.get("email", "").strip()
+        email    = request.form.get("email", "").strip()
         password = request.form.get("password", "").strip()
 
-        log_info(
-            module=MODULE_NAME,
-            action="login_post",
-            message=f"Login attempt for email: {email}",
-            status="STARTED",
-        )
+        log_info(module=MODULE_NAME, action="login_post",
+                 message=f"Login attempt for email: {email}", status="STARTED")
 
         if not email or not password:
-            log_warning(
-                module=MODULE_NAME,
-                action="login_validation",
-                message="Email or password missing in login attempt",
-                status="FAILED",
-            )
-            return render_template(
-                "login.html",
-                error="Email and password are required.",
-            )
+            log_warning(module=MODULE_NAME, action="login_validation",
+                        message="Email or password missing", status="FAILED")
+            return render_template("login.html", error="Email and password are required.")
 
         user = get_user_by_email(email)
 
         if user is None:
-            log_warning(
-                module=MODULE_NAME,
-                action="login_authentication",
-                message=f"Login failed. Email not found: {email}",
-                status="FAILED",
-            )
+            log_warning(module=MODULE_NAME, action="login_authentication",
+                        message=f"Login failed. Email not found: {email}", status="FAILED")
             return render_template("login.html", error="Invalid email or password.")
 
-        existing_password = str(user.get("password", "")).strip()
-
-        if password != existing_password:
-            log_warning(
-                module=MODULE_NAME,
-                action="login_authentication",
-                message=f"Login failed. Password mismatch for: {email}",
-                status="FAILED",
-            )
+        if password != str(user.get("password", "")).strip():
+            log_warning(module=MODULE_NAME, action="login_authentication",
+                        message=f"Login failed. Password mismatch for: {email}", status="FAILED")
             return render_template("login.html", error="Invalid email or password.")
 
         role = str(user.get("role", "")).strip().lower()
 
         if not is_valid_role(role):
-            log_warning(
-                module=MODULE_NAME,
-                action="login_role_validation",
-                message=f"Invalid role '{role}' for email: {email}",
-                status="FAILED",
-            )
-            return render_template(
-                "login.html",
-                error="Invalid role assigned to this user.",
-            )
+            log_warning(module=MODULE_NAME, action="login_role_validation",
+                        message=f"Invalid role '{role}' for: {email}", status="FAILED")
+            return render_template("login.html", error="Invalid role assigned to this user.")
 
         session.clear()
         session["is_logged_in"] = True
-        session["role"] = role
-        session["name"] = str(user.get("name", "")).strip()
-        session["ops_name"] = str(user.get("ops_name", "")).strip()
-        session["email"] = str(user.get("email", "")).strip()
+        session["role"]         = role
+        session["name"]         = str(user.get("name", "")).strip()
+        session["ops_name"]     = str(user.get("ops_name", "")).strip()
+        session["email"]        = str(user.get("email", "")).strip()
 
-        log_info(
-            module=MODULE_NAME,
-            action="login_authentication",
-            message=f"Login successful for email: {email}, role: {role}",
-            status="SUCCESS",
-        )
+        log_info(module=MODULE_NAME, action="login_authentication",
+                 message=f"Login successful for: {email}, role: {role}", status="SUCCESS")
 
         return redirect_user_by_role(role)
 
     except Exception as exc:
-        log_error(
-            module=MODULE_NAME,
-            action="login_post",
-            message="Login request failed with unexpected error",
-            error=exc,
-            status="FAILED",
-        )
+        log_error(module=MODULE_NAME, action="login_post",
+                  message="Login request failed", error=exc, status="FAILED")
         return render_template("login.html", error="Something went wrong. Please try again.")
 
 
 @app.route("/logout", methods=["GET"])
 def logout():
-    """
-    Clears session and redirects to login page.
-    """
+    """Clears session and redirects to login."""
 
     user_email = session.get("email", "unknown")
     session.clear()
 
-    log_info(
-        module=MODULE_NAME,
-        action="logout",
-        message=f"User logged out: {user_email}",
-        status="SUCCESS",
-    )
+    log_info(module=MODULE_NAME, action="logout",
+             message=f"User logged out: {user_email}", status="SUCCESS")
 
     return redirect(url_for("login"))
 
@@ -685,14 +677,8 @@ def logout():
 @login_required
 @role_required("superadmin")
 def superadmin_dashboard():
-    """Superadmin dashboard page."""
-
-    log_info(
-        module=MODULE_NAME,
-        action="superadmin_dashboard",
-        message="Superadmin dashboard requested",
-        status="SUCCESS",
-    )
+    log_info(module=MODULE_NAME, action="superadmin_dashboard",
+             message="Superadmin dashboard requested", status="SUCCESS")
 
     return render_template(
         "superadmin/dashboard.html",
@@ -707,14 +693,8 @@ def superadmin_dashboard():
 @login_required
 @role_required("admin")
 def admin_dashboard():
-    """Admin dashboard page."""
-
-    log_info(
-        module=MODULE_NAME,
-        action="admin_dashboard",
-        message="Admin dashboard requested",
-        status="SUCCESS",
-    )
+    log_info(module=MODULE_NAME, action="admin_dashboard",
+             message="Admin dashboard requested", status="SUCCESS")
 
     return render_template(
         "admin/dashboard.html",
@@ -729,14 +709,8 @@ def admin_dashboard():
 @login_required
 @role_required("data")
 def data_dashboard():
-    """Data dashboard page."""
-
-    log_info(
-        module=MODULE_NAME,
-        action="data_dashboard",
-        message="Data dashboard requested",
-        status="SUCCESS",
-    )
+    log_info(module=MODULE_NAME, action="data_dashboard",
+             message="Data dashboard requested", status="SUCCESS")
 
     return render_template(
         "data/dashboard.html",
@@ -751,14 +725,8 @@ def data_dashboard():
 @login_required
 @role_required("operator")
 def operator_dashboard():
-    """Operator dashboard page."""
-
-    log_info(
-        module=MODULE_NAME,
-        action="operator_dashboard",
-        message="Operator dashboard requested",
-        status="SUCCESS",
-    )
+    log_info(module=MODULE_NAME, action="operator_dashboard",
+             message="Operator dashboard requested", status="SUCCESS")
 
     return render_template(
         "operator/dashboard.html",
@@ -770,24 +738,17 @@ def operator_dashboard():
 
 
 # =========================
-# Routes: Admin Panel API
+# Routes: Admin Panel — User
 # =========================
 
 @app.route("/admin-panel/add-user", methods=["POST"])
 @login_required
 def add_user():
     """
-    Inserts a new user into role_login table.
-
-    Access: superadmin, admin only.
-    superadmin can assign any role.
-    admin can only assign: data, operator.
-
-    Form fields:
-        role, name, ops_name, email, password
-
-    Returns:
-        JSON — {"success": True/False, "message"/"error": str}
+    Inserts a new user into role_login.
+    Access: superadmin only.
+    Form fields: role, name, ops_name, email, password
+    Returns JSON.
     """
 
     access_error = check_admin_panel_access()
@@ -796,90 +757,68 @@ def add_user():
 
     current_role = session.get("role", "")
 
+    # Only superadmin can add users
+    if current_role != "superadmin":
+        return jsonify({"success": False, "error": "Only superadmin can add users."}), 403
+
     try:
-        new_role    = str(request.form.get("role", "")).strip().lower()
-        name        = str(request.form.get("name", "")).strip()
-        ops_name    = str(request.form.get("ops_name", "")).strip()
-        email       = str(request.form.get("email", "")).strip()
-        password    = str(request.form.get("password", "")).strip()
+        new_role = str(request.form.get("role", "")).strip().lower()
+        name     = str(request.form.get("name", "")).strip()
+        ops_name = str(request.form.get("ops_name", "")).strip()
+        email    = str(request.form.get("email", "")).strip()
+        password = str(request.form.get("password", "")).strip()
 
-        log_info(
-            module=MODULE_NAME,
-            action="add_user",
-            message=(
-                f"Add user request by {session.get('email')} "
-                f"for ops_name: {ops_name}, role: {new_role}"
-            ),
-            status="STARTED",
-        )
+        log_info(module=MODULE_NAME, action="add_user",
+                 message=f"Add user by {session.get('email')}: ops_name={ops_name}, role={new_role}",
+                 status="STARTED")
 
-        # Role field presence check
         if not new_role:
             return jsonify({"success": False, "error": "Role is required."}), 400
 
-        # Role assignment permission check (backend guard, not just frontend)
         allowed_new_roles = get_allowed_new_roles(current_role)
 
         if new_role not in allowed_new_roles:
-            log_warning(
-                module=MODULE_NAME,
-                action="add_user",
-                message=(
-                    f"Unauthorized role assignment by {session.get('email')}: "
-                    f"tried to assign '{new_role}'"
-                ),
-                status="FAILED",
-            )
+            log_warning(module=MODULE_NAME, action="add_user",
+                        message=f"Unauthorized role assignment '{new_role}' by {session.get('email')}",
+                        status="FAILED")
             return jsonify({
                 "success": False,
                 "error": f"You are not permitted to assign the role '{new_role}'.",
             }), 403
 
-        # Validate remaining fields
-        fields_to_validate = [
+        for value, field_name, max_len in [
             (name,     "name",     ROLE_LOGIN_MAX_LENGTHS["name"]),
             (ops_name, "ops_name", ROLE_LOGIN_MAX_LENGTHS["ops_name"]),
             (email,    "email",    ROLE_LOGIN_MAX_LENGTHS["email"]),
             (password, "password", ROLE_LOGIN_MAX_LENGTHS["password"]),
-        ]
+        ]:
+            err = validate_string_field(value, field_name, max_len)
+            if err:
+                return jsonify({"success": False, "error": err}), 400
 
-        for value, field_name, max_len in fields_to_validate:
-            error_msg = validate_string_field(value, field_name, max_len)
-            if error_msg:
-                return jsonify({"success": False, "error": error_msg}), 400
-
-        # Duplicate check
         connection = get_db_connection()
 
         try:
             duplicate = user_exists_by_ops_name_or_email(connection, ops_name, email)
 
             if duplicate:
-                conflict_field = (
-                    "ops_name" if duplicate.get("ops_name") == ops_name else "email"
-                )
+                conflict = "ops_name" if duplicate.get("ops_name") == ops_name else "email"
                 return jsonify({
                     "success": False,
-                    "error": f"A user with this {conflict_field} already exists.",
+                    "error": f"A user with this {conflict} already exists.",
                 }), 409
 
             insert_role_login_user(connection, {
-                "role": new_role,
-                "name": name,
-                "ops_name": ops_name,
-                "email": email,
-                "password": password,
+                "role": new_role, "name": name,
+                "ops_name": ops_name, "email": email, "password": password,
             })
 
         finally:
             connection.close()
 
-        log_info(
-            module=MODULE_NAME,
-            action="add_user",
-            message=f"User '{ops_name}' added by {session.get('email')}, role: {new_role}",
-            status="SUCCESS",
-        )
+        log_info(module=MODULE_NAME, action="add_user",
+                 message=f"User '{ops_name}' added by {session.get('email')}, role: {new_role}",
+                 status="SUCCESS")
 
         return jsonify({
             "success": True,
@@ -887,31 +826,22 @@ def add_user():
         }), 201
 
     except Exception as exc:
-        log_error(
-            module=MODULE_NAME,
-            action="add_user",
-            message="Add user request failed",
-            error=exc,
-            status="FAILED",
-        )
+        log_error(module=MODULE_NAME, action="add_user",
+                  message="Add user failed", error=exc, status="FAILED")
         return jsonify({"success": False, "error": "Something went wrong. Please try again."}), 500
 
+
+# =========================
+# Routes: Admin Panel — Client
+# =========================
 
 @app.route("/admin-panel/add-client", methods=["POST"])
 @login_required
 def add_client():
     """
-    Inserts or updates a single client in the clients table.
-    Upsert rule: if userId exists → UPDATE, else → INSERT.
-
-    Access: superadmin, admin only.
-
-    Form fields:
-        userId, alias, Broker, algo, Running Type,
-        Operator Name, Category, SubCategory, Acc Type
-
-    Returns:
-        JSON — {"success": True/False, "action": "inserted"/"updated", "message"/"error": str}
+    Upserts a single client by userId.
+    Access: superadmin + admin.
+    Returns JSON with action: inserted | updated.
     """
 
     access_error = check_admin_panel_access()
@@ -924,15 +854,9 @@ def add_client():
             for col in CLIENT_FORM_COLUMNS
         }
 
-        log_info(
-            module=MODULE_NAME,
-            action="add_client",
-            message=(
-                f"Add client request by {session.get('email')} "
-                f"for userId: {client_data.get('userId', '')}"
-            ),
-            status="STARTED",
-        )
+        log_info(module=MODULE_NAME, action="add_client",
+                 message=f"Add client by {session.get('email')}: userId={client_data.get('userId', '')}",
+                 status="STARTED")
 
         validation_error = validate_client_data(client_data)
         if validation_error:
@@ -947,15 +871,9 @@ def add_client():
 
         action_word = "added" if action == "inserted" else "updated"
 
-        log_info(
-            module=MODULE_NAME,
-            action="add_client",
-            message=(
-                f"Client '{client_data['userId']}' {action_word} "
-                f"by {session.get('email')}"
-            ),
-            status="SUCCESS",
-        )
+        log_info(module=MODULE_NAME, action="add_client",
+                 message=f"Client '{client_data['userId']}' {action_word} by {session.get('email')}",
+                 status="SUCCESS")
 
         return jsonify({
             "success": True,
@@ -964,13 +882,8 @@ def add_client():
         }), 200
 
     except Exception as exc:
-        log_error(
-            module=MODULE_NAME,
-            action="add_client",
-            message="Add client request failed",
-            error=exc,
-            status="FAILED",
-        )
+        log_error(module=MODULE_NAME, action="add_client",
+                  message="Add client failed", error=exc, status="FAILED")
         return jsonify({"success": False, "error": "Something went wrong. Please try again."}), 500
 
 
@@ -978,25 +891,9 @@ def add_client():
 @login_required
 def bulk_upload_clients():
     """
-    Bulk upserts clients from an uploaded .xlsx file.
-
-    Access: superadmin, admin only.
-
-    Expected .xlsx columns (header row, any order):
-        userId, alias, Broker, algo, Running Type, Operator Name,
-        Category, SubCategory, Acc Type
-
-    Upsert rule per row: if userId exists → UPDATE, else → INSERT.
-    Rows with validation errors are skipped and reported.
-
-    Returns:
-        JSON — {
-            "success": True/False,
-            "inserted": int,
-            "updated": int,
-            "errors": [{"row": int, "userId": str, "error": str}],
-            "message": str
-        }
+    Bulk upserts clients from .xlsx. Existing userId rows are updated.
+    Access: superadmin + admin.
+    Returns JSON with inserted/updated/error counts.
     """
 
     access_error = check_admin_panel_access()
@@ -1012,56 +909,37 @@ def bulk_upload_clients():
         if not uploaded_file.filename.lower().endswith(".xlsx"):
             return jsonify({"success": False, "error": "Only .xlsx files are accepted."}), 400
 
-        log_info(
-            module=MODULE_NAME,
-            action="bulk_upload_clients",
-            message=(
-                f"Bulk upload started by {session.get('email')}, "
-                f"file: {uploaded_file.filename}"
-            ),
-            status="STARTED",
-        )
-
-        file_bytes = uploaded_file.read()
+        log_info(module=MODULE_NAME, action="bulk_upload_clients",
+                 message=f"Bulk client upload by {session.get('email')}: {uploaded_file.filename}",
+                 status="STARTED")
 
         try:
-            workbook = openpyxl.load_workbook(
-                io.BytesIO(file_bytes),
-                read_only=True,
-                data_only=True,
-            )
+            workbook  = openpyxl.load_workbook(io.BytesIO(uploaded_file.read()),
+                                               read_only=True, data_only=True)
         except Exception:
-            return jsonify({"success": False, "error": "Could not read the uploaded file. Ensure it is a valid .xlsx file."}), 400
+            return jsonify({"success": False,
+                            "error": "Could not read file. Ensure it is a valid .xlsx."}), 400
 
         worksheet = workbook.active
-        rows = list(worksheet.iter_rows(values_only=True))
+        rows      = list(worksheet.iter_rows(values_only=True))
         workbook.close()
 
         if not rows:
             return jsonify({"success": False, "error": "Uploaded file is empty."}), 400
 
-        # Parse header row
-        raw_headers = [
-            str(h).strip() if h is not None else ""
-            for h in rows[0]
-        ]
+        raw_headers    = [str(h).strip() if h is not None else "" for h in rows[0]]
+        missing_cols   = [c for c in CLIENT_FORM_COLUMNS if c not in raw_headers]
 
-        # Validate all required columns are present
-        missing_columns = [
-            col for col in CLIENT_FORM_COLUMNS
-            if col not in raw_headers
-        ]
-
-        if missing_columns:
+        if missing_cols:
             return jsonify({
                 "success": False,
-                "error": f"Missing required columns in file: {', '.join(missing_columns)}",
+                "error": f"Missing columns in file: {', '.join(missing_cols)}",
             }), 400
 
         data_rows = rows[1:]
 
         if not data_rows:
-            return jsonify({"success": False, "error": "No data rows found in file."}), 400
+            return jsonify({"success": False, "error": "No data rows found."}), 400
 
         inserted_count = 0
         updated_count  = 0
@@ -1070,27 +948,17 @@ def bulk_upload_clients():
         connection = get_db_connection()
 
         try:
-            for row_index, row in enumerate(data_rows, start=2):
-                row_values = [
-                    str(v).strip() if v is not None else ""
-                    for v in row
-                ]
-
+            for row_idx, row in enumerate(data_rows, start=2):
+                row_values  = [str(v).strip() if v is not None else "" for v in row]
                 row_dict    = dict(zip(raw_headers, row_values))
                 client_data = {col: row_dict.get(col, "") for col in CLIENT_FORM_COLUMNS}
 
-                validation_error = validate_client_data(client_data)
-
-                if validation_error:
-                    error_rows.append({
-                        "row": row_index,
-                        "userId": client_data.get("userId", ""),
-                        "error": validation_error,
-                    })
+                err = validate_client_data(client_data)
+                if err:
+                    error_rows.append({"row": row_idx, "userId": client_data.get("userId", ""), "error": err})
                     continue
 
                 action = upsert_client(connection, client_data)
-
                 if action == "inserted":
                     inserted_count += 1
                 else:
@@ -1099,16 +967,10 @@ def bulk_upload_clients():
         finally:
             connection.close()
 
-        log_info(
-            module=MODULE_NAME,
-            action="bulk_upload_clients",
-            message=(
-                f"Bulk upload by {session.get('email')} complete: "
-                f"inserted={inserted_count}, updated={updated_count}, "
-                f"errors={len(error_rows)}"
-            ),
-            status="SUCCESS",
-        )
+        log_info(module=MODULE_NAME, action="bulk_upload_clients",
+                 message=(f"Bulk client upload by {session.get('email')}: "
+                          f"inserted={inserted_count}, updated={updated_count}, errors={len(error_rows)}"),
+                 status="SUCCESS")
 
         return jsonify({
             "success": True,
@@ -1116,53 +978,38 @@ def bulk_upload_clients():
             "updated": updated_count,
             "errors": error_rows,
             "message": (
-                f"Bulk upload complete — {inserted_count} inserted, "
-                f"{updated_count} updated"
-                + (f", {len(error_rows)} row(s) skipped due to errors." if error_rows else ".")
+                f"Bulk upload complete — {inserted_count} inserted, {updated_count} updated"
+                + (f", {len(error_rows)} row(s) with errors." if error_rows else ".")
             ),
         }), 200
 
     except Exception as exc:
-        log_error(
-            module=MODULE_NAME,
-            action="bulk_upload_clients",
-            message="Bulk upload failed",
-            error=exc,
-            status="FAILED",
-        )
+        log_error(module=MODULE_NAME, action="bulk_upload_clients",
+                  message="Bulk client upload failed", error=exc, status="FAILED")
         return jsonify({"success": False, "error": "Something went wrong. Please try again."}), 500
 
 
 @app.route("/admin-panel/download-client-template", methods=["GET"])
 @login_required
 def download_client_template():
-    """
-    Generates and serves an .xlsx template file for bulk client upload.
-    The template contains only the header row with the required column names.
-
-    Access: superadmin, admin only.
-    """
+    """Generates and serves .xlsx client upload template. Access: superadmin + admin."""
 
     access_error = check_admin_panel_access()
     if access_error:
         return access_error
 
     try:
-        workbook  = openpyxl.Workbook()
-        worksheet = workbook.active
-        worksheet.title = "Clients"
-        worksheet.append(CLIENT_FORM_COLUMNS)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Clients"
+        ws.append(CLIENT_FORM_COLUMNS)
 
         output = io.BytesIO()
-        workbook.save(output)
+        wb.save(output)
         output.seek(0)
 
-        log_info(
-            module=MODULE_NAME,
-            action="download_client_template",
-            message=f"Client upload template downloaded by {session.get('email')}",
-            status="SUCCESS",
-        )
+        log_info(module=MODULE_NAME, action="download_client_template",
+                 message=f"Client template downloaded by {session.get('email')}", status="SUCCESS")
 
         return send_file(
             output,
@@ -1172,14 +1019,753 @@ def download_client_template():
         )
 
     except Exception as exc:
-        log_error(
-            module=MODULE_NAME,
-            action="download_client_template",
-            message="Client template generation failed",
-            error=exc,
-            status="FAILED",
-        )
+        log_error(module=MODULE_NAME, action="download_client_template",
+                  message="Client template generation failed", error=exc, status="FAILED")
         return jsonify({"success": False, "error": "Could not generate template."}), 500
+
+
+
+# =========================
+# Routes: Admin Panel — Server
+# =========================
+
+@app.route("/admin-panel/add-server", methods=["POST"])
+@login_required
+def add_server():
+    """
+    Inserts a new server into server_info.
+    Rejects if Server name already exists.
+    Access: superadmin + admin.
+    """
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        server_data = {
+            col: str(request.form.get(col, "")).strip()
+            for col in SERVER_FORM_COLUMNS
+        }
+
+        server_name = server_data.get("Server", "")
+
+        log_info(module=MODULE_NAME, action="add_server",
+                 message=f"Add server by {session.get('email')}: Server={server_name}",
+                 status="STARTED")
+
+        validation_error = validate_server_data(server_data)
+        if validation_error:
+            return jsonify({"success": False, "error": validation_error}), 400
+
+        connection = get_db_connection()
+
+        try:
+            if server_exists_by_name(connection, server_name):
+                return jsonify({
+                    "success": False,
+                    "error": f"Server '{server_name}' already exists. Duplicate servers cannot be added.",
+                }), 409
+
+            insert_server(connection, server_data)
+
+        finally:
+            connection.close()
+
+        log_info(module=MODULE_NAME, action="add_server",
+                 message=f"Server '{server_name}' added by {session.get('email')}",
+                 status="SUCCESS")
+
+        return jsonify({
+            "success": True,
+            "message": f"Server '{server_name}' added successfully.",
+        }), 201
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="add_server",
+                  message="Add server failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Something went wrong. Please try again."}), 500
+
+
+@app.route("/admin-panel/bulk-upload-servers", methods=["POST"])
+@login_required
+def bulk_upload_servers():
+    """
+    Bulk inserts new servers from .xlsx.
+    Rows where Server already exists are SKIPPED.
+    Access: superadmin + admin.
+    """
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        uploaded_file = request.files.get("file")
+
+        if not uploaded_file or not uploaded_file.filename:
+            return jsonify({"success": False, "error": "No file uploaded."}), 400
+
+        if not uploaded_file.filename.lower().endswith(".xlsx"):
+            return jsonify({"success": False, "error": "Only .xlsx files are accepted."}), 400
+
+        log_info(module=MODULE_NAME, action="bulk_upload_servers",
+                 message=f"Bulk server upload by {session.get('email')}: {uploaded_file.filename}",
+                 status="STARTED")
+
+        try:
+            workbook = openpyxl.load_workbook(
+                io.BytesIO(uploaded_file.read()), read_only=True, data_only=True)
+        except Exception:
+            return jsonify({"success": False,
+                            "error": "Could not read file. Ensure it is a valid .xlsx."}), 400
+
+        worksheet = workbook.active
+        rows = list(worksheet.iter_rows(values_only=True))
+        workbook.close()
+
+        if not rows:
+            return jsonify({"success": False, "error": "Uploaded file is empty."}), 400
+
+        raw_headers = [str(h).strip() if h is not None else "" for h in rows[0]]
+        missing_cols = [c for c in SERVER_FORM_COLUMNS if c not in raw_headers]
+
+        if missing_cols:
+            return jsonify({
+                "success": False,
+                "error": f"Missing columns in file: {', '.join(missing_cols)}",
+            }), 400
+
+        data_rows = rows[1:]
+
+        if not data_rows:
+            return jsonify({"success": False, "error": "No data rows found."}), 400
+
+        inserted_count = 0
+        skipped_rows = []
+        error_rows = []
+
+        connection = get_db_connection()
+
+        try:
+            for row_idx, row in enumerate(data_rows, start=2):
+                row_values = [str(v).strip() if v is not None else "" for v in row]
+                row_dict = dict(zip(raw_headers, row_values))
+                server_data = {col: row_dict.get(col, "") for col in SERVER_FORM_COLUMNS}
+                server_name = server_data.get("Server", "")
+
+                err = validate_server_data(server_data)
+                if err:
+                    error_rows.append({"row": row_idx, "Server": server_name, "error": err})
+                    continue
+
+                if server_exists_by_name(connection, server_name):
+                    skipped_rows.append({
+                        "row": row_idx,
+                        "Server": server_name,
+                        "reason": "Server already exists.",
+                    })
+                    continue
+
+                insert_server(connection, server_data)
+                inserted_count += 1
+
+        finally:
+            connection.close()
+
+        log_info(module=MODULE_NAME, action="bulk_upload_servers",
+                 message=(f"Bulk server upload by {session.get('email')}: "
+                          f"inserted={inserted_count}, skipped={len(skipped_rows)}, errors={len(error_rows)}"),
+                 status="SUCCESS")
+
+        parts = [f"{inserted_count} inserted"]
+        if skipped_rows:
+            parts.append(f"{len(skipped_rows)} skipped (already exist)")
+        if error_rows:
+            parts.append(f"{len(error_rows)} row(s) with errors")
+
+        return jsonify({
+            "success": True,
+            "inserted": inserted_count,
+            "skipped": skipped_rows,
+            "errors": error_rows,
+            "message": "Bulk server upload complete — " + ", ".join(parts) + ".",
+        }), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="bulk_upload_servers",
+                  message="Bulk server upload failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Something went wrong. Please try again."}), 500
+
+
+@app.route("/admin-panel/download-server-template", methods=["GET"])
+@login_required
+def download_server_template():
+    """Generates and serves .xlsx server upload template. Access: superadmin + admin."""
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Servers"
+        ws.append(SERVER_FORM_COLUMNS)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        log_info(module=MODULE_NAME, action="download_server_template",
+                 message=f"Server template downloaded by {session.get('email')}", status="SUCCESS")
+
+        return send_file(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="server_upload_template.xlsx",
+        )
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="download_server_template",
+                  message="Server template generation failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not generate template."}), 500
+
+
+
+
+# =========================
+# Constants: Server Info Table UI
+# =========================
+
+# All server_info columns in display order.
+# "Server" is the primary key — shown but not editable via the table UI.
+SERVER_INFO_ALL_COLUMNS: list[str] = [
+    "Server", "Username", "IP", "Password",
+    "Stoxxo Id", "Stoxxo Password", "Algo", "Expiry",
+    "Subscriptions", "Logins", "Active", "Avlbl",
+    "Dte", "Aum", "Remarks", "Operator", "Stoxxo URL",
+]
+
+# Columns that cannot be edited (PK)
+SERVER_INFO_READONLY_COLS: frozenset[str] = frozenset({"Server"})
+
+# VARCHAR editable columns with max lengths
+SERVER_INFO_VARCHAR_MAX: dict[str, int] = {
+    "Username":       20,
+    "IP":             20,
+    "Password":       30,
+    "Stoxxo Id":      30,
+    "Stoxxo Password": 30,
+    "Algo":           10,
+    "Expiry":         20,
+    "Dte":            20,
+    "Aum":            20,
+    "Remarks":        200,
+    "Operator":       30,
+    "Stoxxo URL":     100,
+}
+
+# INT editable columns
+SERVER_INFO_INT_COLS: frozenset[str] = frozenset({"Subscriptions", "Logins", "Active", "Avlbl"})
+
+# Union of all editable columns
+SERVER_INFO_EDITABLE: frozenset[str] = (
+    frozenset(SERVER_INFO_VARCHAR_MAX.keys()) | SERVER_INFO_INT_COLS
+)
+
+# Columns whose names contain spaces or special chars and need backtick quoting
+_SERVER_INFO_BACKTICK_COLS: frozenset[str] = frozenset({
+    "Stoxxo Id", "Stoxxo Password", "Stoxxo URL",
+})
+
+
+# =========================
+# DB: Server Info Table UI
+# =========================
+
+def get_all_server_info() -> list[dict]:
+    """Returns all rows from server_info ordered by Server code."""
+
+    query = "SELECT * FROM server_info ORDER BY Server"
+
+    connection = get_db_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            return cursor.fetchall()
+    finally:
+        connection.close()
+
+
+def validate_server_info_field(field: str, value: str) -> Optional[str]:
+    """
+    Validates a single server_info editable field.
+    Returns None if valid, or an error message string.
+    """
+
+    if field not in SERVER_INFO_EDITABLE:
+        return f"Field '{field}' is not editable."
+
+    if field in SERVER_INFO_INT_COLS:
+        if not value and value != "0":
+            return f"Field '{field}' is required."
+        try:
+            int_val = int(value)
+            if int_val < 0:
+                return f"Field '{field}' must be a non-negative integer."
+        except ValueError:
+            return f"Field '{field}' must be a valid integer."
+        return None
+
+    # VARCHAR — length check only (empty allowed for non-required fields)
+    max_len = SERVER_INFO_VARCHAR_MAX.get(field, 255)
+    if len(value) > max_len:
+        return f"Field '{field}' exceeds maximum length of {max_len} characters."
+
+    return None
+
+
+def update_server_info_field(server_code: str, field: str, value: str) -> None:
+    """
+    Updates a single editable column in server_info identified by Server code.
+    INT columns are cast before storage.
+    """
+
+    if field in _SERVER_INFO_BACKTICK_COLS:
+        col_sql = f"`{field}`"
+    elif " " in field:
+        col_sql = f"`{field}`"
+    else:
+        col_sql = field
+
+    if field in SERVER_INFO_INT_COLS:
+        typed_value = int(value)
+    else:
+        typed_value = value
+
+    query = f"UPDATE server_info SET {col_sql} = %s WHERE Server = %s"
+
+    connection = get_db_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(query, (typed_value, server_code))
+    finally:
+        connection.close()
+
+
+# =========================
+# Routes: Server Info API
+# =========================
+
+@app.route("/api/server-info", methods=["GET"])
+@login_required
+def api_get_server_info():
+    """Returns all server_info rows as JSON. Access: superadmin + admin."""
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        rows = get_all_server_info()
+
+        servers = [
+            {k: (v if v is not None else "") for k, v in row.items()}
+            for row in rows
+        ]
+
+        log_info(module=MODULE_NAME, action="api_get_server_info",
+                 message=f"Returned {len(servers)} server rows to {session.get('email')}",
+                 status="SUCCESS")
+
+        return jsonify({"success": True, "servers": servers}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_server_info",
+                  message="Failed to fetch server_info", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not load server info."}), 500
+
+
+@app.route("/api/server-info/update-field", methods=["POST"])
+@login_required
+def api_update_server_info_field():
+    """
+    Updates a single editable field on a server_info row.
+
+    Expected form fields:
+        server  (str) — Server code identifying the row (PK)
+        field   (str) — column name to update
+        value   (str) — new value
+
+    Access: superadmin + admin.
+    """
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        server_code = str(request.form.get("server", "")).strip()
+        field       = str(request.form.get("field",  "")).strip()
+        value       = str(request.form.get("value",  "")).strip()
+
+        if not server_code:
+            return jsonify({"success": False, "error": "server is required."}), 400
+
+        if field not in SERVER_INFO_EDITABLE:
+            return jsonify({"success": False,
+                            "error": f"Field '{field}' is not editable."}), 400
+
+        validation_error = validate_server_info_field(field, value)
+        if validation_error:
+            return jsonify({"success": False, "error": validation_error}), 400
+
+        update_server_info_field(server_code, field, value)
+
+        log_info(module=MODULE_NAME, action="api_update_server_info_field",
+                 message=(
+                     f"Server info field updated by {session.get('email')}: "
+                     f"server={server_code}, field={field}"
+                 ),
+                 status="SUCCESS")
+
+        return jsonify({"success": True, "message": "Saved."}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_update_server_info_field",
+                  message="Inline server_info update failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not save change."}), 500
+
+
+# =========================
+# Constants: Inline Edit
+# =========================
+
+# Columns the tables UI is allowed to update on the clients table.
+# "server" also triggers an Operator Name sync from server_info.
+CLIENT_INLINE_EDITABLE: frozenset[str] = frozenset({
+    "alias", "server", "algo", "Running Type", "Acc Type",
+})
+
+RUNNING_TYPE_VALUES: frozenset[str] = frozenset({"INT", "POS"})
+
+ACC_TYPE_VALUES: frozenset[str] = frozenset({
+    "Client",
+    "PS_Personal",
+    "RD_Personal",
+    "VT_Personal",
+    "GB_Personal",
+})
+
+# Display order for the client table columns in the Tables UI.
+CLIENT_TABLE_COLUMNS: list[str] = [
+    "userId",
+    "alias",
+    "Broker",
+    "server",
+    "algo",
+    "Running Type",
+    "Operator Name",
+    "Category",
+    "SubCategory",
+    "Acc Type",
+]
+
+
+# =========================
+# DB: Tables UI Operations
+# =========================
+
+def get_all_clients() -> list[dict]:
+    """Returns all rows from the clients table ordered by userId."""
+
+    query = """
+        SELECT userId, alias, Broker, server, algo,
+               `Running Type`, `Operator Name`,
+               Category, SubCategory, `Acc Type`
+        FROM clients
+        ORDER BY userId
+    """
+
+    connection = get_db_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            return cursor.fetchall()
+    finally:
+        connection.close()
+
+
+def get_servers_for_dropdown() -> list[dict]:
+    """
+    Returns Server code + Operator name from server_info.
+    Used to populate the server dropdown and auto-fill Operator Name.
+    """
+
+    query = "SELECT Server, Operator FROM server_info ORDER BY Server"
+
+    connection = get_db_connection()
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            return cursor.fetchall()
+    finally:
+        connection.close()
+
+
+def validate_inline_field(field: str, value: str) -> Optional[str]:
+    """
+    Validates a single inline-editable client field.
+    Returns None if valid, or an error message string.
+    """
+
+    if field not in CLIENT_INLINE_EDITABLE:
+        return f"Field '{field}' is not editable."
+
+    if field == "alias":
+        return validate_string_field(value, "alias", 30)
+
+    if field == "algo":
+        if len(value) > 10:
+            return "Field 'algo' exceeds maximum length of 10 characters."
+        return None
+
+    if field == "Running Type":
+        if value not in RUNNING_TYPE_VALUES:
+            return f"Running Type must be one of: {', '.join(sorted(RUNNING_TYPE_VALUES))}."
+        return None
+
+    if field == "Acc Type":
+        if value not in ACC_TYPE_VALUES:
+            return f"Acc Type must be one of: {', '.join(sorted(ACC_TYPE_VALUES))}."
+        return None
+
+    if field == "server":
+        # Empty string is acceptable (client has no server assigned)
+        return None
+
+    return None
+
+
+def update_client_inline_field(
+    user_id: str,
+    field: str,
+    value: str,
+) -> dict:
+    """
+    Updates a single editable field on the clients table.
+
+    If field == "server", also syncs Operator Name from server_info.
+
+    Returns a dict with keys:
+        operator_name (str | None) — new operator name when field=="server",
+                                     else None.
+    """
+
+    connection = get_db_connection()
+
+    try:
+        if field == "server":
+            # Resolve operator from server_info for the chosen server.
+            operator_name: str = ""
+
+            if value:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT Operator FROM server_info WHERE Server = %s LIMIT 1",
+                        (value,),
+                    )
+                    row = cursor.fetchone()
+                    operator_name = str(row["Operator"]).strip() if row and row.get("Operator") else ""
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE clients
+                    SET server = %s, `Operator Name` = %s
+                    WHERE userId = %s
+                    """,
+                    (value, operator_name, user_id),
+                )
+
+            return {"operator_name": operator_name}
+
+        else:
+            # Generic column update — build query dynamically using a
+            # whitelist-derived column name (safe: field already validated).
+            col = f"`{field}`" if " " in field else field
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"UPDATE clients SET {col} = %s WHERE userId = %s",
+                    (value, user_id),
+                )
+
+            return {"operator_name": None}
+
+    finally:
+        connection.close()
+
+
+# =========================
+# Routes: Tables Pages
+# =========================
+
+@app.route("/superadmin/tables", methods=["GET"])
+@login_required
+@role_required("superadmin")
+def superadmin_tables():
+    log_info(module=MODULE_NAME, action="superadmin_tables",
+             message="Superadmin tables page requested", status="SUCCESS")
+
+    return render_template(
+        "superadmin/tables.html",
+        name=session.get("name"),
+        ops_name=session.get("ops_name"),
+        email=session.get("email"),
+        role=session.get("role"),
+    )
+
+
+@app.route("/admin/tables", methods=["GET"])
+@login_required
+@role_required("admin")
+def admin_tables():
+    log_info(module=MODULE_NAME, action="admin_tables",
+             message="Admin tables page requested", status="SUCCESS")
+
+    return render_template(
+        "admin/tables.html",
+        name=session.get("name"),
+        ops_name=session.get("ops_name"),
+        email=session.get("email"),
+        role=session.get("role"),
+    )
+
+
+# =========================
+# Routes: Tables API
+# =========================
+
+@app.route("/api/clients", methods=["GET"])
+@login_required
+def api_get_clients():
+    """Returns all clients as JSON. Access: superadmin + admin."""
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        rows = get_all_clients()
+
+        # Normalise: replace None with empty string for JSON cleanliness
+        clients = [
+            {k: (v if v is not None else "") for k, v in row.items()}
+            for row in rows
+        ]
+
+        log_info(module=MODULE_NAME, action="api_get_clients",
+                 message=f"Returned {len(clients)} clients to {session.get('email')}",
+                 status="SUCCESS")
+
+        return jsonify({"success": True, "clients": clients}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_clients",
+                  message="Failed to fetch clients", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not load clients."}), 500
+
+
+@app.route("/api/servers", methods=["GET"])
+@login_required
+def api_get_servers():
+    """Returns server codes + operators from server_info. Access: superadmin + admin."""
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        rows = get_servers_for_dropdown()
+
+        servers = [
+            {
+                "Server": row.get("Server", "") or "",
+                "Operator": row.get("Operator", "") or "",
+            }
+            for row in rows
+        ]
+
+        return jsonify({"success": True, "servers": servers}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_servers",
+                  message="Failed to fetch servers", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not load servers."}), 500
+
+
+@app.route("/api/clients/update-field", methods=["POST"])
+@login_required
+def api_update_client_field():
+    """
+    Updates a single inline-editable field on a client record.
+
+    Expected form fields:
+        userId  (str) — identifies the row
+        field   (str) — column name to update
+        value   (str) — new value
+
+    When field == "server", also syncs Operator Name from server_info.
+
+    Returns JSON with success flag + optional operator_name.
+    Access: superadmin + admin.
+    """
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        user_id = str(request.form.get("userId", "")).strip()
+        field   = str(request.form.get("field",  "")).strip()
+        value   = str(request.form.get("value",  "")).strip()
+
+        if not user_id:
+            return jsonify({"success": False, "error": "userId is required."}), 400
+
+        if field not in CLIENT_INLINE_EDITABLE:
+            return jsonify({"success": False, "error": f"Field '{field}' is not editable."}), 400
+
+        validation_error = validate_inline_field(field, value)
+        if validation_error:
+            return jsonify({"success": False, "error": validation_error}), 400
+
+        result = update_client_inline_field(user_id, field, value)
+
+        log_info(module=MODULE_NAME, action="api_update_client_field",
+                 message=(
+                     f"Client field updated by {session.get('email')}: "
+                     f"userId={user_id}, field={field}"
+                 ),
+                 status="SUCCESS")
+
+        return jsonify({
+            "success": True,
+            "message": f"Saved.",
+            "operator_name": result.get("operator_name"),
+        }), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_update_client_field",
+                  message="Inline client update failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not save change."}), 500
 
 
 # =========================
@@ -1188,29 +1774,13 @@ def download_client_template():
 
 @app.errorhandler(404)
 def page_not_found(error):
-    """Handles unknown routes."""
-
-    log_error(
-        module=MODULE_NAME,
-        action="404_error",
-        message="Page not found",
-        error=error,
-        status="FAILED",
-    )
-
+    log_error(module=MODULE_NAME, action="404_error",
+              message="Page not found", error=error, status="FAILED")
     return render_template("login.html", error="Page not found."), 404
 
 
 @app.errorhandler(500)
 def internal_server_error(error):
-    """Handles internal server errors."""
-
-    log_error(
-        module=MODULE_NAME,
-        action="500_error",
-        message="Internal server error",
-        error=error,
-        status="FAILED",
-    )
-
+    log_error(module=MODULE_NAME, action="500_error",
+              message="Internal server error", error=error, status="FAILED")
     return render_template("login.html", error="Internal server error."), 500
