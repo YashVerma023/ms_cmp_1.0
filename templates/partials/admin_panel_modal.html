@@ -1,0 +1,475 @@
+<!--
+    templates/partials/admin_panel_modal.html
+
+    Admin Panel Modal — shared partial for superadmin and admin dashboards.
+
+    Included via:
+        include 'partials/admin_panel_modal.html'
+
+    Requires the parent template to pass:
+        role — session role string (superadmin or admin)
+
+    Features:
+        Tab 1: Add User
+            - Role dropdown (superadmin sees all 4 roles; admin sees data + operator only)
+            - name, ops_name, email, password inputs
+            - Submits via AJAX → /admin-panel/add-user
+
+        Tab 2: Add Client
+            - Mode toggle: Single Add | Bulk Upload
+            - Single: all client fields except server → /admin-panel/add-client
+            - Bulk: .xlsx file upload → /admin-panel/bulk-upload-clients
+            - Download template link → /admin-panel/download-client-template
+-->
+
+<!-- Admin Panel Modal -->
+<div class="modal-overlay" id="adminPanelModal" role="dialog" aria-modal="true" aria-labelledby="adminPanelTitle">
+    <div class="modal-box">
+
+        <div class="modal-header">
+            <h2 class="modal-title" id="adminPanelTitle">Admin Panel</h2>
+            <button type="button" class="modal-close" id="adminPanelClose" aria-label="Close modal">&times;</button>
+        </div>
+
+        <!-- Tab Switcher -->
+        <div class="modal-tabs" role="tablist">
+            <button class="tab-btn active" role="tab" aria-selected="true" data-tab="tab-add-user">Add User</button>
+            <button class="tab-btn" role="tab" aria-selected="false" data-tab="tab-add-client">Add Client</button>
+        </div>
+
+        <!-- ========================== -->
+        <!-- Tab: Add User              -->
+        <!-- ========================== -->
+        <div id="tab-add-user" class="tab-content active" role="tabpanel">
+
+            <div id="addUserResult" class="result-box" style="display: none;"></div>
+
+            <form id="addUserForm" autocomplete="off" novalidate>
+
+                <div class="form-group">
+                    <label class="form-label" for="userRole">Role</label>
+                    <select class="form-control" id="userRole" name="role" required>
+                        <option value="">Select role...</option>
+                        {% if role == "superadmin" %}
+                        <option value="superadmin">Superadmin</option>
+                        <option value="admin">Admin</option>
+                        {% endif %}
+                        <option value="data">Data</option>
+                        <option value="operator">Operator</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="userName">Name</label>
+                    <input class="form-control" type="text" id="userName" name="name"
+                        maxlength="30" required placeholder="Full name (max 30 chars)">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="userOpsName">Ops Name</label>
+                    <input class="form-control" type="text" id="userOpsName" name="ops_name"
+                        maxlength="20" required placeholder="Short ops identifier (max 20 chars)">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="userEmail">Email</label>
+                    <input class="form-control" type="email" id="userEmail" name="email"
+                        maxlength="30" required placeholder="user@megaserve.tech">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="userPassword">Password</label>
+                    <input class="form-control" type="text" id="userPassword" name="password"
+                        maxlength="30" required placeholder="Set password (max 30 chars)">
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full" id="addUserSubmitBtn">
+                    Add User
+                </button>
+
+            </form>
+        </div>
+
+        <!-- ========================== -->
+        <!-- Tab: Add Client            -->
+        <!-- ========================== -->
+        <div id="tab-add-client" class="tab-content" role="tabpanel">
+
+            <!-- Mode toggle: Single / Bulk -->
+            <div class="upload-mode-btns">
+                <button type="button" class="mode-btn active" data-mode="single">Single Add</button>
+                <button type="button" class="mode-btn" data-mode="bulk">Bulk Upload</button>
+            </div>
+
+            <!-- Single Add Form -->
+            <div id="clientSingleSection">
+
+                <div id="addClientResult" class="result-box" style="display: none;"></div>
+
+                <form id="addClientForm" autocomplete="off" novalidate>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientUserId">User ID</label>
+                        <input class="form-control" type="text" id="clientUserId" name="userId"
+                            maxlength="20" required placeholder="Unique client ID (max 20 chars)">
+                        <small class="form-hint">If this ID already exists, the record will be updated.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientAlias">Alias</label>
+                        <input class="form-control" type="text" id="clientAlias" name="alias"
+                            maxlength="30" required placeholder="Client alias (max 30 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientBroker">Broker</label>
+                        <input class="form-control" type="text" id="clientBroker" name="Broker"
+                            maxlength="20" required placeholder="Broker name (max 20 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientAlgo">Algo</label>
+                        <input class="form-control" type="text" id="clientAlgo" name="algo"
+                            maxlength="10" required placeholder="Algo type (max 10 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientRunningType">Running Type</label>
+                        <input class="form-control" type="text" id="clientRunningType" name="Running Type"
+                            maxlength="20" required placeholder="Running type (max 20 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientOperatorName">Operator Name</label>
+                        <input class="form-control" type="text" id="clientOperatorName" name="Operator Name"
+                            maxlength="20" required placeholder="Operator name (max 20 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientCategory">Category</label>
+                        <input class="form-control" type="text" id="clientCategory" name="Category"
+                            maxlength="20" required placeholder="Category (max 20 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientSubCategory">Sub Category</label>
+                        <input class="form-control" type="text" id="clientSubCategory" name="SubCategory"
+                            maxlength="20" required placeholder="Sub category (max 20 chars)">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="clientAccType">Acc Type</label>
+                        <input class="form-control" type="text" id="clientAccType" name="Acc Type"
+                            maxlength="20" required placeholder="Account type (max 20 chars)">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="addClientSubmitBtn">
+                        Save Client
+                    </button>
+
+                </form>
+            </div>
+
+            <!-- Bulk Upload Section -->
+            <div id="clientBulkSection" style="display: none;">
+
+                <div id="bulkUploadResult" class="result-box" style="display: none;"></div>
+
+                <p class="text-muted" style="font-size: 13px; margin-bottom: 14px; line-height: 1.6;">
+                    Upload an <strong>.xlsx</strong> file with the columns listed below.
+                    Existing records (matched by <strong>userId</strong>) will be updated;
+                    new records will be inserted.
+                </p>
+
+                <div class="bulk-columns-preview">
+                    <span>userId</span><span>alias</span><span>Broker</span><span>algo</span>
+                    <span>Running Type</span><span>Operator Name</span><span>Category</span>
+                    <span>SubCategory</span><span>Acc Type</span>
+                </div>
+
+                <a href="/admin-panel/download-client-template"
+                    class="btn-link-download"
+                    download="client_upload_template.xlsx">
+                    ↓ Download Template
+                </a>
+
+                <form id="bulkUploadForm" enctype="multipart/form-data" style="margin-top: 18px;" novalidate>
+
+                    <div class="form-group">
+                        <label class="form-label" for="bulkFile">Upload .xlsx File</label>
+                        <input class="form-control" type="file" id="bulkFile" name="file"
+                            accept=".xlsx" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="bulkUploadSubmitBtn">
+                        Upload &amp; Process
+                    </button>
+
+                </form>
+            </div>
+
+        </div>
+        <!-- end tab-add-client -->
+
+    </div>
+    <!-- end modal-box -->
+</div>
+<!-- end modal-overlay -->
+
+
+<script>
+(function () {
+    "use strict";
+
+    // ─── Elements ────────────────────────────────────────────────────────────
+
+    const modal          = document.getElementById("adminPanelModal");
+    const openBtn        = document.getElementById("adminControlBtn");
+    const closeBtn       = document.getElementById("adminPanelClose");
+
+    const tabBtns        = modal.querySelectorAll(".tab-btn");
+    const tabContents    = modal.querySelectorAll(".tab-content");
+
+    const modeBtns       = modal.querySelectorAll(".mode-btn");
+    const singleSection  = document.getElementById("clientSingleSection");
+    const bulkSection    = document.getElementById("clientBulkSection");
+
+    const addUserForm    = document.getElementById("addUserForm");
+    const addClientForm  = document.getElementById("addClientForm");
+    const bulkUploadForm = document.getElementById("bulkUploadForm");
+
+
+    // ─── Modal Open / Close ──────────────────────────────────────────────────
+
+    function openModal() {
+        modal.classList.add("active");
+        document.body.classList.add("modal-open");
+    }
+
+    function closeModal() {
+        modal.classList.remove("active");
+        document.body.classList.remove("modal-open");
+    }
+
+    if (openBtn) {
+        openBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            openModal();
+        });
+    }
+
+    closeBtn.addEventListener("click", closeModal);
+
+    modal.addEventListener("click", function (e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal.classList.contains("active")) {
+            closeModal();
+        }
+    });
+
+
+    // ─── Tab Switching ───────────────────────────────────────────────────────
+
+    tabBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            const targetId = btn.getAttribute("data-tab");
+
+            tabBtns.forEach(function (b) {
+                b.classList.remove("active");
+                b.setAttribute("aria-selected", "false");
+            });
+
+            tabContents.forEach(function (c) {
+                c.classList.remove("active");
+            });
+
+            btn.classList.add("active");
+            btn.setAttribute("aria-selected", "true");
+            document.getElementById(targetId).classList.add("active");
+        });
+    });
+
+
+    // ─── Single / Bulk Mode Toggle ───────────────────────────────────────────
+
+    modeBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            const mode = btn.getAttribute("data-mode");
+
+            modeBtns.forEach(function (b) {
+                b.classList.remove("active");
+            });
+
+            btn.classList.add("active");
+
+            if (mode === "single") {
+                singleSection.style.display = "block";
+                bulkSection.style.display   = "none";
+            } else {
+                singleSection.style.display = "none";
+                bulkSection.style.display   = "block";
+            }
+
+            // Clear results when switching mode
+            hideResult("addClientResult");
+            hideResult("bulkUploadResult");
+        });
+    });
+
+
+    // ─── Result Helpers ──────────────────────────────────────────────────────
+
+    function showResult(containerId, success, message, extraLines) {
+        const box = document.getElementById(containerId);
+
+        box.style.display = "block";
+        box.className     = "result-box " + (success ? "result-success" : "result-error");
+
+        let html = "<strong>" + escapeHtml(message) + "</strong>";
+
+        if (extraLines && extraLines.length > 0) {
+            html += "<ul class='result-list'>";
+            extraLines.forEach(function (line) {
+                html += "<li>" + escapeHtml(line) + "</li>";
+            });
+            html += "</ul>";
+        }
+
+        box.innerHTML = html;
+        box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function hideResult(containerId) {
+        const box = document.getElementById(containerId);
+        if (box) {
+            box.style.display = "none";
+            box.innerHTML     = "";
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.appendChild(document.createTextNode(String(text)));
+        return div.innerHTML;
+    }
+
+    function setSubmitState(btn, loading, loadingText, defaultText) {
+        btn.disabled     = loading;
+        btn.textContent  = loading ? loadingText : defaultText;
+    }
+
+
+    // ─── Add User Form ───────────────────────────────────────────────────────
+
+    addUserForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        hideResult("addUserResult");
+
+        const submitBtn = document.getElementById("addUserSubmitBtn");
+        setSubmitState(submitBtn, true, "Saving...", "Add User");
+
+        fetch("/admin-panel/add-user", {
+            method: "POST",
+            body: new FormData(addUserForm),
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            showResult("addUserResult", data.success, data.message || data.error);
+            if (data.success) {
+                addUserForm.reset();
+            }
+        })
+        .catch(function () {
+            showResult("addUserResult", false, "Network error. Please try again.");
+        })
+        .finally(function () {
+            setSubmitState(submitBtn, false, "", "Add User");
+        });
+    });
+
+
+    // ─── Add Client (Single) Form ────────────────────────────────────────────
+
+    addClientForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        hideResult("addClientResult");
+
+        const submitBtn = document.getElementById("addClientSubmitBtn");
+        setSubmitState(submitBtn, true, "Saving...", "Save Client");
+
+        fetch("/admin-panel/add-client", {
+            method: "POST",
+            body: new FormData(addClientForm),
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            showResult("addClientResult", data.success, data.message || data.error);
+            if (data.success) {
+                addClientForm.reset();
+            }
+        })
+        .catch(function () {
+            showResult("addClientResult", false, "Network error. Please try again.");
+        })
+        .finally(function () {
+            setSubmitState(submitBtn, false, "", "Save Client");
+        });
+    });
+
+
+    // ─── Bulk Upload Form ────────────────────────────────────────────────────
+
+    bulkUploadForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        hideResult("bulkUploadResult");
+
+        const fileInput = document.getElementById("bulkFile");
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showResult("bulkUploadResult", false, "Please select a file to upload.");
+            return;
+        }
+
+        const submitBtn = document.getElementById("bulkUploadSubmitBtn");
+        setSubmitState(submitBtn, true, "Processing...", "Upload & Process");
+
+        fetch("/admin-panel/bulk-upload-clients", {
+            method: "POST",
+            body: new FormData(bulkUploadForm),
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (data.success) {
+                const extras = [];
+
+                if (data.errors && data.errors.length > 0) {
+                    data.errors.forEach(function (err) {
+                        extras.push(
+                            "Row " + err.row +
+                            (err.userId ? " (userId: " + err.userId + ")" : "") +
+                            ": " + err.error
+                        );
+                    });
+                }
+
+                showResult("bulkUploadResult", true, data.message, extras);
+                bulkUploadForm.reset();
+            } else {
+                showResult("bulkUploadResult", false, data.error || "Upload failed.");
+            }
+        })
+        .catch(function () {
+            showResult("bulkUploadResult", false, "Network error. Please try again.");
+        })
+        .finally(function () {
+            setSubmitState(submitBtn, false, "", "Upload & Process");
+        });
+    });
+
+}());
+</script>

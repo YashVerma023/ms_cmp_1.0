@@ -169,7 +169,7 @@
     function initTouchOptimizations() {
         document.addEventListener(
             "touchstart",
-            function () {},
+            function () { },
             { passive: true }
         );
     }
@@ -193,3 +193,29 @@
         showClientAlert: showClientAlert
     };
 })();
+
+// ================================
+// Settings Dropdown
+// ================================
+
+document.addEventListener("DOMContentLoaded", function () {
+    const settingsButton = document.getElementById("settingsButton");
+    const settingsDropdown = document.getElementById("settingsDropdown");
+
+    if (!settingsButton || !settingsDropdown) {
+        return;
+    }
+
+    settingsButton.addEventListener("click", function (event) {
+        event.stopPropagation();
+        settingsDropdown.classList.toggle("active");
+    });
+
+    document.addEventListener("click", function () {
+        settingsDropdown.classList.remove("active");
+    });
+
+    settingsDropdown.addEventListener("click", function (event) {
+        event.stopPropagation();
+    });
+});

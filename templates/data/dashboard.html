@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Superadmin Dashboard | CMP</title>
+    <title>Data Dashboard | CMP</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -17,7 +17,7 @@
                 <div class="topbar-logo">C</div>
                 <div>
                     <div class="topbar-title">CMP Operation App</div>
-                    <small class="text-muted">Superadmin Dashboard</small>
+                    <small class="text-muted">Data Dashboard</small>
                 </div>
             </div>
 
@@ -35,11 +35,6 @@
 
                     <div class="settings-dropdown" id="settingsDropdown">
                         <div class="settings-dropdown-header">Settings</div>
-
-                        <a href="#" class="settings-dropdown-item" id="adminControlBtn">
-                            <span>◎</span>
-                            <span>Admin Control</span>
-                        </a>
 
                         <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
                             Log Out
@@ -62,31 +57,31 @@
             <div class="grid grid-4">
 
                 <div class="card dashboard-card dashboard-card-purple">
-                    <div class="dashboard-card-icon">👑</div>
-                    <h2 class="card-title">Role Access</h2>
-                    <p class="card-subtitle">Superadmin control panel</p>
-                    <h3 class="dashboard-card-value">Full</h3>
+                    <div class="dashboard-card-icon">📤</div>
+                    <h2 class="card-title">Data Upload</h2>
+                    <p class="card-subtitle">Manage operation data</p>
+                    <h3 class="dashboard-card-value">Ready</h3>
                 </div>
 
                 <div class="card dashboard-card dashboard-card-blue">
-                    <div class="dashboard-card-icon">👥</div>
-                    <h2 class="card-title">Users</h2>
-                    <p class="card-subtitle">Role login users</p>
+                    <div class="dashboard-card-icon">🖥️</div>
+                    <h2 class="card-title">Server Info</h2>
+                    <p class="card-subtitle">Server-related records</p>
                     <h3 class="dashboard-card-value">Active</h3>
                 </div>
 
                 <div class="card dashboard-card dashboard-card-green">
-                    <div class="dashboard-card-icon">🗄️</div>
-                    <h2 class="card-title">Database</h2>
-                    <p class="card-subtitle">CMP MySQL connected</p>
-                    <h3 class="dashboard-card-value">Online</h3>
+                    <div class="dashboard-card-icon">✅</div>
+                    <h2 class="card-title">Validation</h2>
+                    <p class="card-subtitle">Data quality checks</p>
+                    <h3 class="dashboard-card-value">Live</h3>
                 </div>
 
                 <div class="card dashboard-card dashboard-card-orange">
                     <div class="dashboard-card-icon">📊</div>
-                    <h2 class="card-title">Monitoring</h2>
-                    <p class="card-subtitle">Logs and app tracking</p>
-                    <h3 class="dashboard-card-value">Live</h3>
+                    <h2 class="card-title">Reports</h2>
+                    <p class="card-subtitle">Prepare and view reports</p>
+                    <h3 class="dashboard-card-value">View</h3>
                 </div>
 
             </div>
@@ -94,8 +89,6 @@
         </section>
 
     </main>
-
-    {% include 'partials/admin_panel_modal.html' %}
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>

@@ -1,14 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>CMP Login</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='css/style.css') }}"
-    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-input-wrapper .form-control {
+            padding-right: 46px;
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 12px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 18px;
+            color: #6b7280;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-toggle-btn:hover {
+            color: #111827;
+        }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0 18px;
+            font-size: 14px;
+            color: #4b5563;
+        }
+
+        .remember-row input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .remember-row label {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
 </head>
 
 <body>
@@ -26,36 +74,35 @@
             <div data-alert-container></div>
 
             {% if error %}
-                <div class="alert alert-danger" data-auto-hide="5000">
-                    {{ error }}
-                </div>
+            <div class="alert alert-danger" data-auto-hide="5000">
+                {{ error }}
+            </div>
             {% endif %}
 
-            <form method="POST" action="/login" data-validate-form>
+            <form method="POST" action="/login" data-validate-form autocomplete="on" id="loginForm">
                 <div class="form-group">
                     <label class="form-label" for="email">Email</label>
-                    <input
-                        class="form-control"
-                        type="email"
-                        id="email"
-                        name="email"
-                        maxlength="30"
-                        required
-                        placeholder="Enter your email"
-                    >
+                    <input class="form-control" type="email" id="email" name="email" maxlength="30" required
+                        placeholder="Enter your email" autocomplete="username email">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="password">Password</label>
-                    <input
-                        class="form-control"
-                        type="password"
-                        id="password"
-                        name="password"
-                        maxlength="30"
-                        required
-                        placeholder="Enter your password"
-                    >
+
+                    <div class="password-input-wrapper">
+                        <input class="form-control" type="password" id="password" name="password" maxlength="30"
+                            required placeholder="Enter your password" autocomplete="current-password">
+
+                        <button type="button" class="password-toggle-btn" id="togglePassword" aria-label="Show password"
+                            title="Show password">
+                            👁
+                        </button>
+                    </div>
+                </div>
+
+                <div class="remember-row">
+                    <input type="checkbox" id="rememberMe" name="remember_me">
+                    <label for="rememberMe">Remember me</label>
                 </div>
 
                 <button type="submit" class="btn btn-primary btn-full">
@@ -77,5 +124,55 @@
     </main>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const loginForm = document.getElementById("loginForm");
+            const emailInput = document.getElementById("email");
+            const passwordInput = document.getElementById("password");
+            const rememberMe = document.getElementById("rememberMe");
+            const togglePassword = document.getElementById("togglePassword");
+
+            const REMEMBER_KEY = "cmp_remember_me";
+            const EMAIL_KEY = "cmp_login_email";
+
+            const savedRememberValue = localStorage.getItem(REMEMBER_KEY);
+            const savedEmail = localStorage.getItem(EMAIL_KEY);
+
+            if (savedRememberValue === "true" && savedEmail) {
+                emailInput.value = savedEmail;
+                rememberMe.checked = true;
+            }
+
+            togglePassword.addEventListener("click", function () {
+                const isPasswordHidden = passwordInput.type === "password";
+
+                passwordInput.type = isPasswordHidden ? "text" : "password";
+
+                togglePassword.textContent = isPasswordHidden ? "🙈" : "👁";
+                togglePassword.setAttribute(
+                    "aria-label",
+                    isPasswordHidden ? "Hide password" : "Show password"
+                );
+                togglePassword.setAttribute(
+                    "title",
+                    isPasswordHidden ? "Hide password" : "Show password"
+                );
+            });
+
+            loginForm.addEventListener("submit", function () {
+                const emailValue = emailInput.value.trim();
+
+                if (rememberMe.checked && emailValue !== "") {
+                    localStorage.setItem(REMEMBER_KEY, "true");
+                    localStorage.setItem(EMAIL_KEY, emailValue);
+                } else {
+                    localStorage.removeItem(REMEMBER_KEY);
+                    localStorage.removeItem(EMAIL_KEY);
+                }
+            });
+        });
+    </script>
 </body>
+
 </html>
