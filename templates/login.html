@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CMP Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+<body>
+
+    <main class="auth-page">
+        <section class="auth-card">
+
+            <div class="auth-brand">
+                <div class="auth-logo">C</div>
+            </div>
+
+            <h1 class="auth-title">CMP Login</h1>
+            <p class="auth-subtitle">Operation Web App Access</p>
+
+            <div data-alert-container></div>
+
+            {% if error %}
+                <div class="alert alert-danger" data-auto-hide="5000">
+                    {{ error }}
+                </div>
+            {% endif %}
+
+            <form method="POST" action="/login" data-validate-form>
+                <div class="form-group">
+                    <label class="form-label" for="email">Email</label>
+                    <input
+                        class="form-control"
+                        type="email"
+                        id="email"
+                        name="email"
+                        maxlength="30"
+                        required
+                        placeholder="Enter your email"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input
+                        class="form-control"
+                        type="password"
+                        id="password"
+                        name="password"
+                        maxlength="30"
+                        required
+                        placeholder="Enter your password"
+                    >
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">
+                    Login
+                </button>
+            </form>
+
+            <div class="d-flex justify-between align-center mt-2">
+                <p class="auth-footer">
+                    © CMP Operation App
+                </p>
+
+                <button type="button" class="theme-toggle" data-theme-toggle>
+                    Dark Mode
+                </button>
+            </div>
+
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Superadmin Dashboard | CMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+<body>
+
+    <main class="app-page">
+
+        <header class="topbar">
+            <div class="topbar-brand">
+                <div class="topbar-logo">C</div>
+                <div>
+                    <div class="topbar-title">CMP Operation App</div>
+                    <small class="text-muted">Superadmin Dashboard</small>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button type="button" class="theme-toggle" data-theme-toggle>
+                    Dark Mode
+                </button>
+
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary">
+                    Logout
+                </a>
+            </div>
+        </header>
+
+        <section class="page-container">
+
+            <div class="page-header">
+                <h1 class="page-title">Welcome, {{ name }}</h1>
+                <p class="page-subtitle">
+                    Logged in as {{ role }} | {{ email }}
+                </p>
+            </div>
+
+            <div class="grid grid-4">
+
+                <div class="card dashboard-card dashboard-card-purple">
+                    <div class="dashboard-card-icon">👑</div>
+                    <h2 class="card-title">Role Access</h2>
+                    <p class="card-subtitle">Superadmin control panel</p>
+                    <h3 class="dashboard-card-value">Full</h3>
+                </div>
+
+                <div class="card dashboard-card dashboard-card-blue">
+                    <div class="dashboard-card-icon">👥</div>
+                    <h2 class="card-title">Users</h2>
+                    <p class="card-subtitle">Role login users</p>
+                    <h3 class="dashboard-card-value">Active</h3>
+                </div>
+
+                <div class="card dashboard-card dashboard-card-green">
+                    <div class="dashboard-card-icon">🗄️</div>
+                    <h2 class="card-title">Database</h2>
+                    <p class="card-subtitle">CMP MySQL connected</p>
+                    <h3 class="dashboard-card-value">Online</h3>
+                </div>
+
+                <div class="card dashboard-card dashboard-card-orange">
+                    <div class="dashboard-card-icon">📊</div>
+                    <h2 class="card-title">Monitoring</h2>
+                    <p class="card-subtitle">Logs and app tracking</p>
+                    <h3 class="dashboard-card-value">Live</h3>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
