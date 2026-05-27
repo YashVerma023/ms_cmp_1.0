@@ -7,6 +7,13 @@ Central helper module for:
 3. Basic project monitoring utilities
 
 This file should stay in the main project directory.
+
+Log levels used:
+    INFO    — general informational events (page loads, session events)
+    UPDATE  — a record was modified / a field was changed inline
+    ADDED   — a new record was inserted into the database
+    WARNING — something unexpected but non-fatal
+    ERROR   — operation failed
 """
 
 from __future__ import annotations
@@ -96,12 +103,12 @@ def write_log(
     Writes one log entry into logs/logs.csv.
 
     Args:
-        level: INFO, WARNING, ERROR, DEBUG
-        module: File or module name
-        action: What operation is being performed
+        level:   INFO | UPDATE | ADDED | WARNING | ERROR
+        module:  File or module name
+        action:  What operation is being performed
         message: Human-readable message
-        status: SUCCESS, FAILED, SKIPPED, STARTED
-        error: Optional error message
+        status:  SUCCESS, FAILED, SKIPPED, STARTED
+        error:   Optional error message
     """
 
     ensure_log_file_exists()
@@ -138,6 +145,52 @@ def log_info(
 
     write_log(
         level="INFO",
+        module=module,
+        action=action,
+        message=message,
+        status=status,
+    )
+
+
+def log_update(
+    *,
+    module: str,
+    action: str,
+    message: str,
+    status: str = "SUCCESS",
+) -> None:
+    """
+    Logs an UPDATE event — use whenever a record field is modified.
+    Written with level=UPDATE in CSV and INFO in terminal.
+    """
+
+    logger.info(f"{module} | {action} | {message} | {status}")
+
+    write_log(
+        level="UPDATE",
+        module=module,
+        action=action,
+        message=message,
+        status=status,
+    )
+
+
+def log_added(
+    *,
+    module: str,
+    action: str,
+    message: str,
+    status: str = "SUCCESS",
+) -> None:
+    """
+    Logs an ADDED event — use whenever a new record is inserted.
+    Written with level=ADDED in CSV and INFO in terminal.
+    """
+
+    logger.info(f"{module} | {action} | {message} | {status}")
+
+    write_log(
+        level="ADDED",
         module=module,
         action=action,
         message=message,

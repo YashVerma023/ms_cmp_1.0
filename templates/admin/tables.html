@@ -32,6 +32,10 @@
 
                     <div class="settings-dropdown" id="settingsDropdown">
                         <div class="settings-dropdown-header">Settings</div>
+                        <a href="{{ url_for('admin_admin_control') }}" class="settings-dropdown-item">
+                            <span>◎</span>
+                            <span>Admin Control</span>
+                        </a>
                         <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
                             Log Out
                         </a>
@@ -97,8 +101,17 @@
         </div>
     </main>
 
+
+    <!-- ============================================================ -->
+    <!-- ADMIN PANEL MODAL — ADMIN ROLE                               -->
+    <!-- Tabs: Add Client | Add Server                                -->
+    <!-- ============================================================ -->
+    <!-- Admin Panel modal removed — navigate to /admin/admin-control -->
+
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 
+    <!-- ── Tables + InlineTable JS ──────────────────────────────── -->
     <script>
     (function () {
         "use strict";
@@ -127,93 +140,228 @@
                 btn.classList.add("active");
                 var pane = document.getElementById(btn.getAttribute("data-target"));
                 pane.classList.add("active");
-
-                // Lazy-load server config on first open
                 if (btn.getAttribute("data-target") === "tab-server-config" && !serverLoaded) {
                     loadServerConfig();
                 }
             });
         });
 
-        // ── Generic InlineTable factory ───────────────────────────
-        //
-        // config {
-        //   areaId      : string   — container div id
-        //   countId     : string   — record count badge id
-        //   pkField     : string   — primary-key column (identifies row in update call)
-        //   pkParam     : string   — form field name sent to backend for the PK value
-        //   apiUpdate   : string   — POST URL for update-field
-        //   columns     : string[] — ordered list of columns to display
-        //   editable    : object   — { colName: { type:"text"|"number"|"select", maxlength?, options? } }
-        //   readonlyAuto: string[] — columns shown read-only (italics), not double-clickable
-        //   onAfterSave : fn(td, col, newVal, data, tr)  — optional hook for side effects
-        // }
-
+        // ── InlineTable factory ───────────────────────────────────
+        // Features: global search, per-column filter, sort, checkbox, True/False badges
         function InlineTable(config) {
-            var rowsData = [];
+            var rowsData   = [];
+            var filterVals = {};
+            var searchVal  = "";
+            var sortCol    = null;
+            var sortDir    = 1;
+            var checkedPks = {};
 
-            function show(html) {
-                document.getElementById(config.areaId).innerHTML = html;
+            var GSEARCH_ID = config.areaId + "-gs";
+
+            function getArea() { return document.getElementById(config.areaId); }
+
+            function updateCount(n) {
+                var el = document.getElementById(config.countId);
+                if (!el) return;
+                var total = rowsData.length;
+                el.textContent = (n < total ? n + " / " + total : n) + " record" + (n !== 1 ? "s" : "");
             }
 
-            function setCount(n) {
-                var el = document.getElementById(config.countId);
-                if (el) el.textContent = n + " record" + (n !== 1 ? "s" : "");
+            function renderVal(val) {
+                if (val === "True"  || val === "true")  return "<span class='val-badge val-true'>True</span>";
+                if (val === "False" || val === "false") return "<span class='val-badge val-false'>False</span>";
+                return esc(val);
+            }
+
+            function getFiltered() {
+                var keys = Object.keys(filterVals);
+                var sv   = searchVal;
+                var data = rowsData;
+
+                if (keys.length) {
+                    data = data.filter(function (row) {
+                        return keys.every(function (col) {
+                            var v = String(row[col] !== undefined ? row[col] : "").toLowerCase();
+                            return v.indexOf(filterVals[col]) !== -1;
+                        });
+                    });
+                }
+                if (sv) {
+                    data = data.filter(function (row) {
+                        return config.columns.some(function (col) {
+                            var v = String(row[col] !== undefined ? row[col] : "").toLowerCase();
+                            return v.indexOf(sv) !== -1;
+                        });
+                    });
+                }
+                if (sortCol) {
+                    data = data.slice().sort(function (a, b) {
+                        var av = String(a[sortCol] !== undefined ? a[sortCol] : "");
+                        var bv = String(b[sortCol] !== undefined ? b[sortCol] : "");
+                        var n1 = parseFloat(av), n2 = parseFloat(bv);
+                        if (!isNaN(n1) && !isNaN(n2)) return (n1 - n2) * sortDir;
+                        return av.localeCompare(bv) * sortDir;
+                    });
+                }
+                return data;
+            }
+
+            function buildRowsHtml(rows) {
+                var html = "";
+                rows.forEach(function (row) {
+                    var pk  = String(row[config.pkField] || "");
+                    var chk = checkedPks[pk] ? " checked" : "";
+                    html += "<tr data-pk='" + esc(pk) + "'>";
+                    html += "<td class='col-check'><input type='checkbox' class='row-chk'" + chk + " data-pk='" + esc(pk) + "'></td>";
+                    config.columns.forEach(function (col) {
+                        var val  = row[col] !== undefined ? String(row[col]) : "";
+                        var disp = renderVal(val);
+                        if (config.readonlyAuto && config.readonlyAuto.indexOf(col) !== -1) {
+                            html += "<td class='cell-readonly' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + disp + "</td>";
+                        } else if (config.editable && config.editable[col]) {
+                            html += "<td class='cell-editable' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + disp + "</td>";
+                        } else {
+                            html += "<td data-col='" + esc(col) + "'>" + disp + "</td>";
+                        }
+                    });
+                    html += "</tr>";
+                });
+                return html;
+            }
+
+            function syncSelectAll(area) {
+                var allChk = area.querySelector(".chk-all");
+                if (!allChk) return;
+                var boxes = area.querySelectorAll(".row-chk");
+                var n = 0;
+                boxes.forEach(function (b) { if (b.checked) n++; });
+                allChk.checked       = boxes.length > 0 && n === boxes.length;
+                allChk.indeterminate = n > 0 && n < boxes.length;
+            }
+
+            function attachRowChkListeners(area) {
+                area.querySelectorAll(".row-chk").forEach(function (chk) {
+                    chk.addEventListener("change", function () {
+                        var pk = chk.getAttribute("data-pk");
+                        if (chk.checked) { checkedPks[pk] = true; } else { delete checkedPks[pk]; }
+                        syncSelectAll(area);
+                    });
+                });
+            }
+
+            function attachEditListeners(area) {
+                area.querySelectorAll("td.cell-editable").forEach(function (td) {
+                    td.addEventListener("dblclick", function () { startEdit(td); });
+                });
+            }
+
+            function applyFilters() {
+                var filtered = getFiltered();
+                var area = getArea();
+                if (!area) return;
+                var tbody = area.querySelector("tbody");
+                if (tbody) {
+                    tbody.innerHTML = buildRowsHtml(filtered);
+                    attachRowChkListeners(area);
+                    attachEditListeners(area);
+                    syncSelectAll(area);
+                }
+                updateCount(filtered.length);
             }
 
             this.render = function (rows) {
-                rowsData = rows;
-                setCount(rows.length);
+                rowsData   = rows;
+                filterVals = {};
+                searchVal  = "";
+                sortCol    = null;
+                checkedPks = {};
+                var area   = getArea();
+                if (!area) return;
 
                 if (!rows.length) {
-                    show("<div class='table-empty'>No records found.</div>");
+                    area.innerHTML = "<div class='table-search-wrap'><input class='table-search-input' placeholder='Search…'></div><div class='table-empty'>No records found.</div>";
+                    updateCount(0);
                     return;
                 }
 
-                var html = "<div class='data-table-wrapper'><table class='data-table'><thead><tr>";
-                config.columns.forEach(function (col) { html += "<th>" + esc(col) + "</th>"; });
+                var html = "<div class='table-search-wrap'><input class='table-search-input' id='" + GSEARCH_ID + "' placeholder='🔍  Search all columns…'></div>";
+                html += "<div class='data-table-wrapper'><table class='data-table'><thead>";
+                html += "<tr><th class='col-check'><input type='checkbox' class='chk-all'></th>";
+                config.columns.forEach(function (col) {
+                    html += "<th class='th-sortable' data-scol='" + esc(col) + "'>" + esc(col) + "<span class='sort-arrow'>⇅</span></th>";
+                });
+                html += "</tr><tr class='filter-row'><th class='col-check'></th>";
+                config.columns.forEach(function (col) {
+                    html += "<th><input class='filter-input' data-filter-col='" + esc(col) + "' placeholder='🔍'></th>";
+                });
                 html += "</tr></thead><tbody>";
+                html += buildRowsHtml(rows);
+                html += "</tbody></table></div>";
+                area.innerHTML = html;
 
-                rows.forEach(function (row) {
-                    var pk = String(row[config.pkField] || "");
-                    html += "<tr data-pk='" + esc(pk) + "'>";
+                var gsInp = document.getElementById(GSEARCH_ID);
+                if (gsInp) {
+                    gsInp.addEventListener("input", function () {
+                        searchVal = gsInp.value.trim().toLowerCase();
+                        applyFilters();
+                    });
+                }
 
-                    config.columns.forEach(function (col) {
-                        var val = row[col] !== undefined ? String(row[col]) : "";
+                area.querySelectorAll("th.th-sortable").forEach(function (th) {
+                    th.addEventListener("click", function () {
+                        var col = th.getAttribute("data-scol");
+                        if (sortCol === col) { sortDir = -sortDir; }
+                        else { sortCol = col; sortDir = 1; }
+                        area.querySelectorAll("th.th-sortable").forEach(function (t) {
+                            t.classList.remove("th-sort-asc", "th-sort-desc");
+                            t.querySelector(".sort-arrow").textContent = "⇅";
+                        });
+                        th.classList.add(sortDir === 1 ? "th-sort-asc" : "th-sort-desc");
+                        th.querySelector(".sort-arrow").textContent = sortDir === 1 ? "↑" : "↓";
+                        applyFilters();
+                    });
+                });
 
-                        if (config.readonlyAuto && config.readonlyAuto.indexOf(col) !== -1) {
-                            html += "<td class='cell-readonly' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + esc(val) + "</td>";
-                        } else if (config.editable && config.editable[col]) {
-                            html += "<td class='cell-editable' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + esc(val) + "</td>";
-                        } else {
-                            // PK or non-editable column
-                            html += "<td data-col='" + esc(col) + "'>" + esc(val) + "</td>";
+                var allChk = area.querySelector(".chk-all");
+                if (allChk) {
+                    allChk.addEventListener("change", function () {
+                        var filtered = getFiltered();
+                        filtered.forEach(function (row) {
+                            var pk = String(row[config.pkField] || "");
+                            if (allChk.checked) { checkedPks[pk] = true; } else { delete checkedPks[pk]; }
+                        });
+                        var tbody2 = area.querySelector("tbody");
+                        if (tbody2) {
+                            tbody2.innerHTML = buildRowsHtml(filtered);
+                            attachRowChkListeners(area);
+                            attachEditListeners(area);
                         }
                     });
+                }
 
-                    html += "</tr>";
+                area.querySelectorAll(".filter-input").forEach(function (inp) {
+                    inp.addEventListener("input", function () {
+                        var col = inp.getAttribute("data-filter-col");
+                        var val = inp.value.trim().toLowerCase();
+                        if (val) { filterVals[col] = val; } else { delete filterVals[col]; }
+                        applyFilters();
+                    });
                 });
 
-                html += "</tbody></table></div>";
-                show(html);
-
-                // Attach double-click listeners
-                document.querySelectorAll("#" + config.areaId + " td.cell-editable").forEach(function (td) {
-                    td.addEventListener("dblclick", function () { startEdit(td); });
-                });
+                attachRowChkListeners(area);
+                attachEditListeners(area);
+                updateCount(rows.length);
             };
 
             function startEdit(td) {
                 if (td.classList.contains("cell-editing")) return;
-
-                var col    = td.getAttribute("data-col");
-                var val    = td.getAttribute("data-val") || td.textContent.trim();
-                var cfg    = config.editable[col];
+                var col = td.getAttribute("data-col");
+                var val = td.getAttribute("data-val") || td.textContent.trim();
+                var cfg = config.editable[col];
                 if (!cfg) return;
 
                 td.classList.add("cell-editing");
                 td.innerHTML = "";
-
                 var input;
 
                 if (cfg.type === "select") {
@@ -246,7 +394,6 @@
                     if (newVal === val) { cancelEdit(td, col, val); return; }
                     saveField(td, col, newVal, val);
                 }
-
                 input.addEventListener("blur", commit);
                 input.addEventListener("keydown", function (e) {
                     if (e.key === "Enter")  { input.blur(); }
@@ -267,8 +414,8 @@
 
                 var fd = new FormData();
                 fd.append(config.pkParam, pk);
-                fd.append("field",        col);
-                fd.append("value",        newVal);
+                fd.append("field", col);
+                fd.append("value", newVal);
 
                 fetch(config.apiUpdate, { method: "POST", body: fd })
                     .then(function (r) { return r.json(); })
@@ -276,19 +423,12 @@
                         if (data.success) {
                             td.classList.remove("cell-editing");
                             td.setAttribute("data-val", newVal);
-                            td.textContent = newVal;
+                            td.innerHTML = renderVal(newVal);
                             flashCell(td);
-
-                            // Update in-memory cache
                             rowsData.forEach(function (row) {
-                                if (String(row[config.pkField]) === pk) {
-                                    row[col] = newVal;
-                                }
+                                if (String(row[config.pkField]) === pk) { row[col] = newVal; }
                             });
-
-                            if (config.onAfterSave) {
-                                config.onAfterSave(td, col, newVal, data, tr);
-                            }
+                            if (config.onAfterSave) { config.onAfterSave(td, col, newVal, data, tr); }
                         } else {
                             alert(data.error || "Could not save change.");
                             cancelEdit(td, col, originalVal);
@@ -300,102 +440,72 @@
                     });
             }
         }
-
-        // ── Client table ──────────────────────────────────────────
-        var serverOperatorMap = {};
-
-        var clientTable = new InlineTable({
-            areaId:    "clientTableArea",
-            countId:   "clientCount",
-            pkField:   "userId",
-            pkParam:   "userId",
-            apiUpdate: "/api/clients/update-field",
-            columns: [
-                "userId", "alias", "Broker", "server",
-                "algo", "Running Type", "Operator Name",
-                "Category", "SubCategory", "Acc Type"
-            ],
-            editable: {
-                "alias":        { type: "text",   maxlength: 30 },
-                "server":       { type: "select", options: [] },
-                "algo":         { type: "text",   maxlength: 10 },
-                "Running Type": { type: "select", options: ["INT", "POS"] },
-                "Acc Type":     { type: "select", options: [
-                    "Client", "PS_Personal", "RD_Personal", "VT_Personal", "GB_Personal"
-                ]}
-            },
-            readonlyAuto: ["Operator Name"],
-            onAfterSave: function (td, col, newVal, data, tr) {
-                // When server changes, sync Operator Name cell
-                if (col === "server" && data.operator_name !== undefined && data.operator_name !== null) {
-                    var opTd = tr.querySelector("td[data-col='Operator Name']");
-                    if (opTd) {
-                        opTd.setAttribute("data-val", data.operator_name);
-                        opTd.textContent = data.operator_name;
-                        flashCell(opTd);
-                    }
-                }
-            }
-        });
+        // end InlineTable
 
         // ── Server Config table ───────────────────────────────────
         var serverLoaded = false;
-
-        var serverConfigTable = new InlineTable({
-            areaId:    "serverTableArea",
-            countId:   "serverCount",
-            pkField:   "Server",
-            pkParam:   "server",
-            apiUpdate: "/api/server-info/update-field",
-            columns: [
-                "Server", "Username", "IP", "Password",
-                "Stoxxo Id", "Stoxxo Password", "Algo", "Expiry",
-                "Subscriptions", "Logins", "Active", "Avlbl",
-                "Dte", "Aum", "Remarks", "Operator", "Stoxxo URL"
-            ],
-            editable: {
-                "Username":       { type: "text",   maxlength: 20 },
-                "IP":             { type: "text",   maxlength: 20 },
-                "Password":       { type: "text",   maxlength: 30 },
-                "Stoxxo Id":      { type: "text",   maxlength: 30 },
-                "Stoxxo Password":{ type: "text",   maxlength: 30 },
-                "Algo":           { type: "text",   maxlength: 10 },
-                "Expiry":         { type: "text",   maxlength: 20 },
-                "Subscriptions":  { type: "number" },
-                "Logins":         { type: "number" },
-                "Active":         { type: "number" },
-                "Avlbl":          { type: "number" },
-                "Dte":            { type: "text",   maxlength: 20 },
-                "Aum":            { type: "text",   maxlength: 20 },
-                "Remarks":        { type: "text",   maxlength: 200 },
-                "Operator":       { type: "text",   maxlength: 30 },
-                "Stoxxo URL":     { type: "text",   maxlength: 100 }
-            }
-            // Server (PK) is not in editable → rendered as plain td, not double-clickable
-        });
+        var serverConfigTable;
 
         function loadServerConfig() {
             document.getElementById("serverTableArea").innerHTML =
                 "<div class='table-loading'>Loading server data…</div>";
 
-            fetch("/api/server-info")
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (!data.success) {
-                        document.getElementById("serverTableArea").innerHTML =
-                            "<div class='table-error'>" + esc(data.error || "Could not load data.") + "</div>";
-                        return;
-                    }
-                    serverLoaded = true;
-                    serverConfigTable.render(data.servers || []);
-                })
-                .catch(function () {
+            Promise.all([
+                fetch("/api/server-info").then(function (r) { return r.json(); }),
+                fetch("/api/operators").then(function (r) { return r.json(); })
+            ]).then(function (results) {
+                var sRes = results[0];
+                var oRes = results[1];
+
+                if (!sRes.success) {
                     document.getElementById("serverTableArea").innerHTML =
-                        "<div class='table-error'>Network error. Could not load server data.</div>";
+                        "<div class='table-error'>" + esc(sRes.error || "Could not load data.") + "</div>";
+                    return;
+                }
+
+                var operatorOptions = (oRes.success && oRes.operators) ? oRes.operators : [];
+
+                serverConfigTable = new InlineTable({
+                    areaId:    "serverTableArea",
+                    countId:   "serverCount",
+                    pkField:   "Server",
+                    pkParam:   "server",
+                    apiUpdate: "/api/server-info/update-field",
+                    columns: [
+                        "Server", "Username", "IP", "Password",
+                        "Stoxxo Id", "Stoxxo Password", "Algo", "Expiry",
+                        "Subscriptions", "Logins", "Active", "Avlbl",
+                        "Dte", "Aum", "Remarks", "Operator", "Stoxxo URL"
+                    ],
+                    editable: {
+                        "Username":        { type: "text",   maxlength: 20 },
+                        "IP":              { type: "text",   maxlength: 20 },
+                        "Password":        { type: "text",   maxlength: 30 },
+                        "Stoxxo Id":       { type: "text",   maxlength: 30 },
+                        "Stoxxo Password": { type: "text",   maxlength: 30 },
+                        "Algo":            { type: "text",   maxlength: 10 },
+                        "Expiry":          { type: "text",   maxlength: 20 },
+                        "Subscriptions":   { type: "number" },
+                        "Logins":          { type: "number" },
+                        "Active":          { type: "number" },
+                        "Avlbl":           { type: "number" },
+                        "Dte":             { type: "text",   maxlength: 20 },
+                        "Aum":             { type: "text",   maxlength: 20 },
+                        "Remarks":         { type: "text",   maxlength: 200 },
+                        "Operator":        { type: "select", options: operatorOptions },
+                        "Stoxxo URL":      { type: "text",   maxlength: 100 }
+                    }
                 });
+
+                serverLoaded = true;
+                serverConfigTable.render(sRes.servers || []);
+            }).catch(function () {
+                document.getElementById("serverTableArea").innerHTML =
+                    "<div class='table-error'>Network error. Could not load server data.</div>";
+            });
         }
 
-        // ── Load client table on page open ────────────────────────
+        // ── Client table ──────────────────────────────────────────
         (function initClientTab() {
             Promise.all([
                 fetch("/api/clients").then(function (r) { return r.json(); }),
@@ -411,22 +521,10 @@
                     return;
                 }
 
-                // Build server dropdown options + operator map
-                if (sRes.success && sRes.servers) {
-                    sRes.servers.forEach(function (s) {
-                        serverOperatorMap[s.Server] = s.Operator || "";
-                    });
-                    // Inject server options into clientTable editable config
-                    clientTable.config = clientTable.config || {};
-                }
-
-                // Patch server options before render (access via closure over clientTable)
                 var serverNames = (sRes.success && sRes.servers)
-                    ? sRes.servers.map(function (s) { return s.Server; })
-                    : [];
+                    ? sRes.servers.map(function (s) { return s.Server; }) : [];
 
-                // Re-create with populated options
-                clientTable = new InlineTable({
+                var clientTable = new InlineTable({
                     areaId:    "clientTableArea",
                     countId:   "clientCount",
                     pkField:   "userId",
@@ -460,7 +558,6 @@
                 });
 
                 clientTable.render(cRes.clients || []);
-
             }).catch(function () {
                 document.getElementById("clientTableArea").innerHTML =
                     "<div class='table-error'>Network error. Could not load client data.</div>";
@@ -470,6 +567,7 @@
 
     }());
     </script>
+
 
 </body>
 </html>

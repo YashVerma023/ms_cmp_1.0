@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Control | CMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <main class="acp-page">
+
+        <!-- ── Topbar ────────────────────────────────────────────── -->
+        <header class="topbar">
+            <div class="topbar-brand">
+                <div class="topbar-logo">C</div>
+                <div>
+                    <div class="topbar-title">CMP Operation App</div>
+                    <small class="text-muted">Admin Control</small>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button type="button" class="theme-toggle" data-theme-toggle>Dark Mode</button>
+
+                <div class="settings-wrapper">
+                    <button type="button" class="settings-btn" id="settingsButton">
+                        <span class="settings-icon">⚙</span>
+                        <span>Settings</span>
+                    </button>
+                    <div class="settings-dropdown" id="settingsDropdown">
+                        <div class="settings-dropdown-header">Settings</div>
+                        <a href="{{ url_for('admin_admin_control') }}" class="settings-dropdown-item">
+                            <span>◎</span>
+                            <span>Admin Control</span>
+                        </a>
+                        <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
+                            Log Out
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ── Page Body ─────────────────────────────────────────── -->
+        <div class="acp-body">
+
+            <!-- ── Left Sidebar ──────────────────────────────────── -->
+            <nav class="acp-sidebar">
+                <div class="acp-sidebar-header">
+                    <p class="acp-sidebar-title">Admin Panel</p>
+                    <p class="acp-sidebar-sub">Logged in as {{ role }}</p>
+                </div>
+
+                <div class="acp-nav-section">
+                    <span class="acp-nav-label">Manage</span>
+
+                    <button class="acp-nav-item active" data-acp="add-client">
+                        <span class="acp-nav-icon">👥</span> Add Client
+                    </button>
+                    <button class="acp-nav-item" data-acp="add-server">
+                        <span class="acp-nav-icon">🖥️</span> Add Server
+                    </button>
+
+                    <div class="acp-nav-divider"></div>
+                    <span class="acp-nav-label">Configuration</span>
+
+                    <button class="acp-nav-item" data-acp="grouping-setting">
+                        <span class="acp-nav-icon">⚙️</span> Grouping Setting
+                    </button>
+                    <button class="acp-nav-item" data-acp="server-setting">
+                        <span class="acp-nav-icon">🔧</span> Server Setting
+                    </button>
+                </div>
+
+                <div class="acp-sidebar-footer">
+                    <a href="{{ url_for('admin_dashboard') }}" class="acp-back-link">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </nav>
+
+            <!-- ── Right Content ─────────────────────────────────── -->
+            <div class="acp-content">
+
+                <!-- ══ Add Client ════════════════════════════════ -->
+                <div id="acp-add-client" class="acp-section active">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Add Client</h2>
+                        <p class="acp-section-subtitle">Add or update a client record. Existing User ID will be updated.</p>
+                    </div>
+                    <div class="acp-form-card">
+                        <div id="addClientResult" class="result-box" style="display:none;"></div>
+                        <form id="addClientForm" autocomplete="off" novalidate>
+
+                            <div class="field-row">
+                                <label class="field-label">User ID <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="userId"
+                                        maxlength="20" required placeholder="Unique client ID (max 20 chars)">
+                                    <small class="form-hint">Existing userId will be updated.</small>
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Alias <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="alias"
+                                        maxlength="30" required placeholder="Client alias (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Broker <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Broker"
+                                        maxlength="20" required placeholder="Broker name (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Algo</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="algo"
+                                        maxlength="10" placeholder="Algo type (max 10 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Running Type</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Running Type"
+                                        maxlength="20" placeholder="Running type (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Category</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Category"
+                                        maxlength="20" placeholder="Category (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Sub Category</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="SubCategory"
+                                        maxlength="20" placeholder="Sub category (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Acc Type</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Acc Type"
+                                        maxlength="20" placeholder="Account type (max 20 chars)">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-full" id="addClientSubmitBtn">
+                                Save Client
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+
+                <!-- ══ Add Server ════════════════════════════════ -->
+                <div id="acp-add-server" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Add Server</h2>
+                        <p class="acp-section-subtitle">Register a new server. Server code must be unique.</p>
+                    </div>
+                    <div class="acp-form-card">
+                        <div id="addServerResult" class="result-box" style="display:none;"></div>
+                        <form id="addServerForm" autocomplete="off" novalidate>
+
+                            <div class="field-row">
+                                <label class="field-label">Server <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Server"
+                                        maxlength="10" required placeholder="Server code (max 10 chars)">
+                                    <small class="form-hint">Must be unique. Duplicates are not allowed.</small>
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Username <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Username"
+                                        maxlength="20" required placeholder="Login username (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">IP <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="IP"
+                                        maxlength="20" required placeholder="Server IP address (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Password <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Password"
+                                        maxlength="30" required placeholder="Server password (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Stoxxo Id <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Stoxxo Id"
+                                        maxlength="30" required placeholder="Stoxxo ID (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Stoxxo Pwd <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Stoxxo Password"
+                                        maxlength="30" required placeholder="Stoxxo password (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Algo</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Algo"
+                                        maxlength="10" placeholder="Algo type (max 10 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Expiry</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Expiry"
+                                        maxlength="20" placeholder="Expiry date (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Subscriptions</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Subscriptions"
+                                        min="0" placeholder="Total subscriptions (default 0)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Logins</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Logins"
+                                        min="0" placeholder="Login count (default 0)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Active</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Active"
+                                        min="0" placeholder="Active count (default 0)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Avlbl</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Avlbl"
+                                        min="0" placeholder="Available slots (default 0)">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-full" id="addServerSubmitBtn">
+                                Add Server
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+
+                <!-- ══ Grouping Setting ══════════════════════════ -->
+                <div id="acp-grouping-setting" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Grouping Setting</h2>
+                        <p class="acp-section-subtitle">Configure client grouping rules and categories.</p>
+                    </div>
+                    <div class="acp-coming-soon">
+                        <div class="acp-coming-soon-icon">⚙️</div>
+                        <div class="acp-coming-soon-title">Coming Soon</div>
+                        <p class="acp-coming-soon-text">
+                            Grouping settings will allow you to define custom categories,
+                            sub-categories, and grouping logic for client classification.
+                        </p>
+                        <span class="acp-badge-soon">In Development</span>
+                    </div>
+                </div>
+
+
+                <!-- ══ Server Setting ════════════════════════════ -->
+                <div id="acp-server-setting" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Server Setting</h2>
+                        <p class="acp-section-subtitle">Manage server-level configuration and defaults.</p>
+                    </div>
+                    <div class="acp-coming-soon">
+                        <div class="acp-coming-soon-icon">🔧</div>
+                        <div class="acp-coming-soon-title">Coming Soon</div>
+                        <p class="acp-coming-soon-text">
+                            Server settings will let you configure global server parameters,
+                            connection defaults, and subscription limits.
+                        </p>
+                        <span class="acp-badge-soon">In Development</span>
+                    </div>
+                </div>
+
+            </div><!-- /.acp-content -->
+        </div><!-- /.acp-body -->
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <script>
+    (function () {
+        "use strict";
+
+        /* ── Section navigation ──────────────────────────────────── */
+        var navBtns  = document.querySelectorAll(".acp-nav-item[data-acp]");
+        var sections = document.querySelectorAll(".acp-section");
+
+        navBtns.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                navBtns.forEach(function (b) { b.classList.remove("active"); });
+                sections.forEach(function (s) { s.classList.remove("active"); });
+                btn.classList.add("active");
+                var target = document.getElementById("acp-" + btn.getAttribute("data-acp"));
+                if (target) target.classList.add("active");
+            });
+        });
+
+        /* ── Helpers ─────────────────────────────────────────────── */
+        function esc(t) {
+            var d = document.createElement("div");
+            d.appendChild(document.createTextNode(String(t == null ? "" : t)));
+            return d.innerHTML;
+        }
+
+        function showResult(id, success, msg) {
+            var box = document.getElementById(id);
+            if (!box) return;
+            box.style.display = "block";
+            box.className = "result-box " + (success ? "result-success" : "result-error");
+            box.innerHTML = "<strong>" + esc(msg) + "</strong>";
+            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function hideResult(id) {
+            var box = document.getElementById(id);
+            if (box) { box.style.display = "none"; box.innerHTML = ""; }
+        }
+
+        function setBtn(id, loading, label) {
+            var btn = document.getElementById(id);
+            if (!btn) return;
+            btn.disabled = loading;
+            btn.textContent = label;
+        }
+
+        function bindForm(formId, url, btnId, resultId, defaultLabel) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                hideResult(resultId);
+                setBtn(btnId, true, "Processing…");
+                fetch(url, { method: "POST", body: new FormData(form) })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        showResult(resultId, data.success, data.message || data.error);
+                        if (data.success) form.reset();
+                    })
+                    .catch(function () {
+                        showResult(resultId, false, "Network error. Please try again.");
+                    })
+                    .finally(function () { setBtn(btnId, false, defaultLabel); });
+            });
+        }
+
+        bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
+        bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
+
+    }());
+    </script>
+
+</body>
+</html>

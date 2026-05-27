@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Control | CMP</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <main class="acp-page">
+
+        <!-- ── Topbar ────────────────────────────────────────────── -->
+        <header class="topbar">
+            <div class="topbar-brand">
+                <div class="topbar-logo">C</div>
+                <div>
+                    <div class="topbar-title">CMP Operation App</div>
+                    <small class="text-muted">Admin Control</small>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+                <button type="button" class="theme-toggle" data-theme-toggle>Dark Mode</button>
+
+                <div class="settings-wrapper">
+                    <button type="button" class="settings-btn" id="settingsButton">
+                        <span class="settings-icon">⚙</span>
+                        <span>Settings</span>
+                    </button>
+                    <div class="settings-dropdown" id="settingsDropdown">
+                        <div class="settings-dropdown-header">Settings</div>
+                        <a href="{{ url_for('superadmin_admin_control') }}" class="settings-dropdown-item">
+                            <span>◎</span>
+                            <span>Admin Control</span>
+                        </a>
+                        <a href="{{ url_for('logout') }}" class="settings-dropdown-item logout-item">
+                            Log Out
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ── Page Body ─────────────────────────────────────────── -->
+        <div class="acp-body">
+
+            <!-- ── Left Sidebar ──────────────────────────────────── -->
+            <nav class="acp-sidebar">
+                <div class="acp-sidebar-header">
+                    <p class="acp-sidebar-title">Admin Panel</p>
+                    <p class="acp-sidebar-sub">Logged in as {{ role }}</p>
+                </div>
+
+                <div class="acp-nav-section">
+                    <span class="acp-nav-label">Manage</span>
+
+                    <button class="acp-nav-item active" data-acp="add-user">
+                        <span class="acp-nav-icon">👤</span> Add User
+                    </button>
+                    <button class="acp-nav-item" data-acp="add-client">
+                        <span class="acp-nav-icon">👥</span> Add Client
+                    </button>
+                    <button class="acp-nav-item" data-acp="add-server">
+                        <span class="acp-nav-icon">🖥️</span> Add Server
+                    </button>
+
+                    <div class="acp-nav-divider"></div>
+                    <span class="acp-nav-label">Users</span>
+
+                    <button class="acp-nav-item" data-acp="view-user">
+                        <span class="acp-nav-icon">📋</span> View User
+                    </button>
+
+                    <div class="acp-nav-divider"></div>
+                    <span class="acp-nav-label">Configuration</span>
+
+                    <button class="acp-nav-item" data-acp="grouping-setting">
+                        <span class="acp-nav-icon">⚙️</span> Grouping Setting
+                    </button>
+                    <button class="acp-nav-item" data-acp="server-setting">
+                        <span class="acp-nav-icon">🔧</span> Server Setting
+                    </button>
+                </div>
+
+                <div class="acp-sidebar-footer">
+                    <a href="{{ url_for('superadmin_dashboard') }}" class="acp-back-link">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </nav>
+
+            <!-- ── Right Content ─────────────────────────────────── -->
+            <div class="acp-content">
+
+                <!-- ══ Add User ══════════════════════════════════ -->
+                <div id="acp-add-user" class="acp-section active">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Add User</h2>
+                        <p class="acp-section-subtitle">Create a new user account with role-based access.</p>
+                    </div>
+                    <div class="acp-form-card">
+                        <div id="addUserResult" class="result-box" style="display:none;"></div>
+                        <form id="addUserForm" autocomplete="off" novalidate>
+
+                            <div class="field-row">
+                                <label class="field-label">Role <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <select class="form-control" name="role" required>
+                                        <option value="">Select role…</option>
+                                        <option value="superadmin">Superadmin</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="data">Data</option>
+                                        <option value="operator">Operator</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Name <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="name"
+                                        maxlength="30" required placeholder="Full name (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Ops Name <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="ops_name"
+                                        maxlength="20" required placeholder="Short ops identifier (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Email <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="email" name="email"
+                                        maxlength="30" required placeholder="user@example.com">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Password <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="password"
+                                        maxlength="30" required placeholder="Set password (max 30 chars)">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-full" id="addUserSubmitBtn">
+                                Add User
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+
+                <!-- ══ Add Client ════════════════════════════════ -->
+                <div id="acp-add-client" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Add Client</h2>
+                        <p class="acp-section-subtitle">Add or update a client record. Existing User ID will be updated.</p>
+                    </div>
+                    <div class="acp-form-card">
+                        <div id="addClientResult" class="result-box" style="display:none;"></div>
+                        <form id="addClientForm" autocomplete="off" novalidate>
+
+                            <div class="field-row">
+                                <label class="field-label">User ID <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="userId"
+                                        maxlength="20" required placeholder="Unique client ID (max 20 chars)">
+                                    <small class="form-hint">Existing userId will be updated.</small>
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Alias <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="alias"
+                                        maxlength="30" required placeholder="Client alias (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Broker <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Broker"
+                                        maxlength="20" required placeholder="Broker name (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Algo</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="algo"
+                                        maxlength="10" placeholder="Algo type (max 10 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Running Type</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Running Type"
+                                        maxlength="20" placeholder="Running type (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Category</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Category"
+                                        maxlength="20" placeholder="Category (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Sub Category</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="SubCategory"
+                                        maxlength="20" placeholder="Sub category (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Acc Type</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Acc Type"
+                                        maxlength="20" placeholder="Account type (max 20 chars)">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-full" id="addClientSubmitBtn">
+                                Save Client
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+
+                <!-- ══ Add Server ════════════════════════════════ -->
+                <div id="acp-add-server" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Add Server</h2>
+                        <p class="acp-section-subtitle">Register a new server. Server code must be unique.</p>
+                    </div>
+                    <div class="acp-form-card">
+                        <div id="addServerResult" class="result-box" style="display:none;"></div>
+                        <form id="addServerForm" autocomplete="off" novalidate>
+
+                            <div class="field-row">
+                                <label class="field-label">Server <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Server"
+                                        maxlength="10" required placeholder="Server code (max 10 chars)">
+                                    <small class="form-hint">Must be unique. Duplicates are not allowed.</small>
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Username <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Username"
+                                        maxlength="20" required placeholder="Login username (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">IP <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="IP"
+                                        maxlength="20" required placeholder="Server IP address (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Password <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Password"
+                                        maxlength="30" required placeholder="Server password (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Stoxxo Id <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Stoxxo Id"
+                                        maxlength="30" required placeholder="Stoxxo ID (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Stoxxo Pwd <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Stoxxo Password"
+                                        maxlength="30" required placeholder="Stoxxo password (max 30 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Algo</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Algo"
+                                        maxlength="10" placeholder="Algo type (max 10 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Expiry</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="Expiry"
+                                        maxlength="20" placeholder="Expiry date (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Subscriptions</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Subscriptions"
+                                        min="0" placeholder="Total subscriptions (default 0)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Logins</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Logins"
+                                        min="0" placeholder="Login count (default 0)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Active</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Active"
+                                        min="0" placeholder="Active count (default 0)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Avlbl</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="number" name="Avlbl"
+                                        min="0" placeholder="Available slots (default 0)">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-full" id="addServerSubmitBtn">
+                                Add Server
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+
+                <!-- ══ View User ══════════════════════════════════ -->
+                <div id="acp-view-user" class="acp-section" style="max-width:100%;">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">View Users</h2>
+                        <p class="acp-section-subtitle">
+                            All role_login accounts. Double-click any editable cell to edit inline.
+                            <strong>Email</strong> is the login key and cannot be changed here.
+                        </p>
+                    </div>
+                    <div id="viewUserResult" class="result-box" style="display:none; margin-bottom:12px;"></div>
+                    <div id="viewUserTableArea">
+                        <div class="table-loading">Loading users…</div>
+                    </div>
+                </div>
+
+
+                <!-- ══ Grouping Setting ═══════════════════════════ -->
+                <div id="acp-grouping-setting" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Grouping Setting</h2>
+                        <p class="acp-section-subtitle">Configure client grouping rules and categories.</p>
+                    </div>
+                    <div class="acp-coming-soon">
+                        <div class="acp-coming-soon-icon">⚙️</div>
+                        <div class="acp-coming-soon-title">Coming Soon</div>
+                        <p class="acp-coming-soon-text">
+                            Grouping settings will let you define custom categories,
+                            sub-categories, and grouping logic for client classification.
+                        </p>
+                        <span class="acp-badge-soon">In Development</span>
+                    </div>
+                </div>
+
+
+                <!-- ══ Server Setting ═════════════════════════════ -->
+                <div id="acp-server-setting" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Server Setting</h2>
+                        <p class="acp-section-subtitle">Manage server-level configuration and defaults.</p>
+                    </div>
+                    <div class="acp-coming-soon">
+                        <div class="acp-coming-soon-icon">🔧</div>
+                        <div class="acp-coming-soon-title">Coming Soon</div>
+                        <p class="acp-coming-soon-text">
+                            Server settings will let you configure global server parameters,
+                            connection defaults, and subscription limits.
+                        </p>
+                        <span class="acp-badge-soon">In Development</span>
+                    </div>
+                </div>
+
+            </div><!-- /.acp-content -->
+        </div><!-- /.acp-body -->
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    <script>
+    (function () {
+        "use strict";
+
+        /* ── Sidebar navigation ──────────────────────────────── */
+        var navBtns  = document.querySelectorAll(".acp-nav-item[data-acp]");
+        var sections = document.querySelectorAll(".acp-section");
+
+        navBtns.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                navBtns.forEach(function (b)  { b.classList.remove("active"); });
+                sections.forEach(function (s) { s.classList.remove("active"); });
+                btn.classList.add("active");
+                var target = document.getElementById("acp-" + btn.getAttribute("data-acp"));
+                if (target) {
+                    target.classList.add("active");
+                    if (btn.getAttribute("data-acp") === "view-user" && !viewUserLoaded) {
+                        loadViewUser();
+                    }
+                }
+            });
+        });
+
+        /* ── Helpers ─────────────────────────────────────────── */
+        function esc(t) {
+            var d = document.createElement("div");
+            d.appendChild(document.createTextNode(String(t == null ? "" : t)));
+            return d.innerHTML;
+        }
+
+        function showResult(id, success, msg) {
+            var box = document.getElementById(id);
+            if (!box) return;
+            box.style.display = "block";
+            box.className = "result-box " + (success ? "result-success" : "result-error");
+            box.innerHTML = "<strong>" + esc(msg) + "</strong>";
+            box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function hideResult(id) {
+            var box = document.getElementById(id);
+            if (box) { box.style.display = "none"; box.innerHTML = ""; }
+        }
+
+        function setBtn(id, loading, label) {
+            var btn = document.getElementById(id);
+            if (!btn) return;
+            btn.disabled = loading;
+            btn.textContent = label;
+        }
+
+        function bindForm(formId, url, btnId, resultId, defaultLabel) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                hideResult(resultId);
+                setBtn(btnId, true, "Processing…");
+                fetch(url, { method: "POST", body: new FormData(form) })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        showResult(resultId, data.success, data.message || data.error);
+                        if (data.success) form.reset();
+                    })
+                    .catch(function () { showResult(resultId, false, "Network error. Please try again."); })
+                    .finally(function () { setBtn(btnId, false, defaultLabel); });
+            });
+        }
+
+        bindForm("addUserForm",   "/admin-panel/add-user",   "addUserSubmitBtn",   "addUserResult",   "Add User");
+        bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
+        bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
+
+
+        /* ══ View User InlineTable ═══════════════════════════ */
+        var viewUserLoaded = false;
+        var viewUserArea   = document.getElementById("viewUserTableArea");
+        var VU_COLUMNS     = ["email", "role", "name", "ops_name", "password"];
+        var VU_EDITABLE    = { "role": "select", "name": "text", "ops_name": "text", "password": "text" };
+        var VU_ROLES       = ["superadmin", "admin", "data", "operator"];
+        var vuRows = [], vuFilter = {}, vuSearch = "", vuSortCol = null, vuSortDir = 1, vuChecked = {};
+
+        function vuGetFiltered() {
+            var rows = vuRows.slice();
+            if (vuSearch) {
+                var q = vuSearch.toLowerCase();
+                rows = rows.filter(function (r) {
+                    return VU_COLUMNS.some(function (c) {
+                        return String(r[c] != null ? r[c] : "").toLowerCase().indexOf(q) !== -1;
+                    });
+                });
+            }
+            Object.keys(vuFilter).forEach(function (col) {
+                var q = (vuFilter[col] || "").toLowerCase();
+                if (!q) return;
+                rows = rows.filter(function (r) {
+                    return String(r[col] != null ? r[col] : "").toLowerCase().indexOf(q) !== -1;
+                });
+            });
+            if (vuSortCol) {
+                rows.sort(function (a, b) {
+                    var av = String(a[vuSortCol] != null ? a[vuSortCol] : "");
+                    var bv = String(b[vuSortCol] != null ? b[vuSortCol] : "");
+                    return vuSortDir * av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+                });
+            }
+            return rows;
+        }
+
+        function vuBuildRows(rows) {
+            if (!rows.length) return "<tr><td colspan='" + (VU_COLUMNS.length + 1) + "' style='text-align:center;padding:32px;color:var(--text-muted);'>No users found.</td></tr>";
+            return rows.map(function (row) {
+                var pk = row["email"] || "";
+                var html = "<tr data-pk='" + esc(pk) + "'>";
+                html += "<td class='col-check'><input type='checkbox' class='vu-row-chk'" + (vuChecked[pk] ? " checked" : "") + "></td>";
+                VU_COLUMNS.forEach(function (col) {
+                    var val = row[col] != null ? String(row[col]) : "";
+                    if (VU_EDITABLE[col]) {
+                        html += "<td class='cell-editable' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + esc(val) + "</td>";
+                    } else {
+                        html += "<td class='cell-readonly'>" + esc(val) + "</td>";
+                    }
+                });
+                return html + "</tr>";
+            }).join("");
+        }
+
+        function vuSyncSelectAll() {
+            var allChk = viewUserArea.querySelector(".vu-all-chk");
+            var rowChks = viewUserArea.querySelectorAll(".vu-row-chk");
+            if (!allChk || !rowChks.length) return;
+            var n = 0;
+            rowChks.forEach(function (c) { if (c.checked) n++; });
+            allChk.indeterminate = n > 0 && n < rowChks.length;
+            allChk.checked = n === rowChks.length;
+        }
+
+        function vuAttachRowChk() {
+            viewUserArea.querySelectorAll(".vu-row-chk").forEach(function (chk) {
+                chk.addEventListener("change", function () {
+                    var pk = (chk.closest("tr") || {}).getAttribute("data-pk");
+                    if (pk) { if (chk.checked) vuChecked[pk] = true; else delete vuChecked[pk]; }
+                    vuSyncSelectAll();
+                });
+            });
+        }
+
+        function vuApplyFilters() {
+            var tbody = viewUserArea.querySelector("tbody");
+            if (tbody) {
+                tbody.innerHTML = vuBuildRows(vuGetFiltered());
+                vuAttachRowChk();
+                vuSyncSelectAll();
+                vuAttachEditListeners();
+            }
+        }
+
+        function vuRender(rows) {
+            vuRows = rows;
+            function arrowFor(col) {
+                if (vuSortCol !== col) return "<span class='sort-arrow'>⇅</span>";
+                return "<span class='sort-arrow'>" + (vuSortDir === 1 ? "↑" : "↓") + "</span>";
+            }
+            var html = "<div class='table-search-wrap'><input class='table-search-input' id='vu-gs' placeholder='🔍  Search all columns…' value='" + esc(vuSearch) + "'></div>";
+            html += "<div class='data-table-wrapper'><table class='data-table'><thead>";
+            html += "<tr><th class='col-check'><input type='checkbox' class='vu-all-chk'></th>";
+            VU_COLUMNS.forEach(function (col) {
+                var cls = "th-sortable" + (vuSortCol === col ? (" " + (vuSortDir === 1 ? "th-sort-asc" : "th-sort-desc")) : "");
+                html += "<th class='" + cls + "' data-scol='" + esc(col) + "'>" + esc(col) + arrowFor(col) + "</th>";
+            });
+            html += "</tr><tr class='filter-row'><th class='col-check'></th>";
+            VU_COLUMNS.forEach(function (col) {
+                html += "<th><input class='filter-input' data-filter-col='" + esc(col) + "' value='" + esc(vuFilter[col] || "") + "' placeholder='🔍'></th>";
+            });
+            html += "</tr></thead><tbody>" + vuBuildRows(vuGetFiltered()) + "</tbody></table></div>";
+            viewUserArea.innerHTML = html;
+
+            document.getElementById("vu-gs").addEventListener("input", function () {
+                vuSearch = this.value; vuApplyFilters();
+            });
+            viewUserArea.querySelectorAll("th.th-sortable").forEach(function (th) {
+                th.addEventListener("click", function () {
+                    var col = th.getAttribute("data-scol");
+                    if (vuSortCol === col) vuSortDir = -vuSortDir;
+                    else { vuSortCol = col; vuSortDir = 1; }
+                    vuRender(vuRows);
+                });
+            });
+            var allChk = viewUserArea.querySelector(".vu-all-chk");
+            if (allChk) {
+                allChk.addEventListener("change", function () {
+                    viewUserArea.querySelectorAll(".vu-row-chk").forEach(function (c) {
+                        c.checked = allChk.checked;
+                        var pk = (c.closest("tr") || {}).getAttribute("data-pk");
+                        if (pk) { if (allChk.checked) vuChecked[pk] = true; else delete vuChecked[pk]; }
+                    });
+                    vuSyncSelectAll();
+                });
+            }
+            viewUserArea.querySelectorAll(".filter-input").forEach(function (inp) {
+                inp.addEventListener("input", function () {
+                    vuFilter[inp.getAttribute("data-filter-col")] = inp.value;
+                    vuApplyFilters();
+                });
+            });
+            vuAttachRowChk();
+            vuSyncSelectAll();
+            vuAttachEditListeners();
+        }
+
+        function vuAttachEditListeners() {
+            viewUserArea.querySelectorAll("td.cell-editable").forEach(function (td) {
+                td.addEventListener("dblclick", function () { vuStartEdit(td); });
+            });
+        }
+
+        function vuStartEdit(td) {
+            if (td.classList.contains("cell-editing")) return;
+            var col = td.getAttribute("data-col");
+            var val = td.getAttribute("data-val") || td.textContent.trim();
+            td.classList.add("cell-editing");
+            td.innerHTML = "";
+            var input;
+            if (VU_EDITABLE[col] === "select") {
+                input = document.createElement("select");
+                input.className = "cell-edit-select";
+                VU_ROLES.forEach(function (r) {
+                    var o = document.createElement("option");
+                    o.value = r; o.textContent = r;
+                    if (r === val) o.selected = true;
+                    input.appendChild(o);
+                });
+            } else {
+                input = document.createElement("input");
+                input.type = "text"; input.className = "cell-edit-input"; input.value = val;
+            }
+            td.appendChild(input);
+            input.focus();
+            if (input.select) input.select();
+            function commit() {
+                var nv = input.value.trim();
+                if (nv === val) { vuCancel(td, val); return; }
+                vuSave(td, col, nv, val);
+            }
+            input.addEventListener("blur", commit);
+            input.addEventListener("keydown", function (e) {
+                if (e.key === "Enter")  input.blur();
+                if (e.key === "Escape") vuCancel(td, val);
+            });
+        }
+
+        function vuCancel(td, orig) {
+            td.classList.remove("cell-editing");
+            td.setAttribute("data-val", orig);
+            td.textContent = orig;
+        }
+
+        function vuSave(td, col, newVal, orig) {
+            var email = (td.closest("tr") || {}).getAttribute("data-pk") || "";
+            if (!email) { vuCancel(td, orig); return; }
+            var fd = new FormData();
+            fd.append("email", email); fd.append("field", col); fd.append("value", newVal);
+            fetch("/api/users/update-field", { method: "POST", body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        td.classList.remove("cell-editing");
+                        td.setAttribute("data-val", newVal);
+                        td.textContent = newVal;
+                        td.classList.remove("cell-saved"); void td.offsetWidth; td.classList.add("cell-saved");
+                        showResult("viewUserResult", true, "Saved.");
+                        var idx = vuRows.findIndex(function (r) { return r["email"] === email; });
+                        if (idx !== -1) vuRows[idx][col] = newVal;
+                    } else {
+                        showResult("viewUserResult", false, data.error || "Could not save.");
+                        vuCancel(td, orig);
+                    }
+                })
+                .catch(function () { showResult("viewUserResult", false, "Network error."); vuCancel(td, orig); });
+        }
+
+        function loadViewUser() {
+            viewUserArea.innerHTML = "<div class='table-loading'>Loading users…</div>";
+            fetch("/api/users")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.success) {
+                        viewUserArea.innerHTML = "<div class='table-error'>" + esc(data.error || "Could not load users.") + "</div>";
+                        return;
+                    }
+                    viewUserLoaded = true;
+                    vuRender(data.users || []);
+                })
+                .catch(function () {
+                    viewUserArea.innerHTML = "<div class='table-error'>Network error.</div>";
+                });
+        }
+
+        if (!Array.prototype.findIndex) {
+            Array.prototype.findIndex = function (fn) {
+                for (var i = 0; i < this.length; i++) { if (fn(this[i])) return i; }
+                return -1;
+            };
+        }
+
+    }());
+    </script>
+
+</body>
+</html>

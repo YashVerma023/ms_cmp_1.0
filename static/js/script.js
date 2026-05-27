@@ -197,17 +197,27 @@
 // ================================
 // Settings Dropdown
 // ================================
+// Uses position:fixed + JS-computed coordinates so the dropdown is never
+// clipped by overflow:hidden on any ancestor (e.g. .app-page).
 
 document.addEventListener("DOMContentLoaded", function () {
-    const settingsButton = document.getElementById("settingsButton");
-    const settingsDropdown = document.getElementById("settingsDropdown");
+    var settingsButton   = document.getElementById("settingsButton");
+    var settingsDropdown = document.getElementById("settingsDropdown");
 
     if (!settingsButton || !settingsDropdown) {
         return;
     }
 
+    function positionDropdown() {
+        var rect = settingsButton.getBoundingClientRect();
+        settingsDropdown.style.top   = (rect.bottom + 8) + "px";
+        settingsDropdown.style.right = (window.innerWidth - rect.right) + "px";
+        settingsDropdown.style.left  = "auto";
+    }
+
     settingsButton.addEventListener("click", function (event) {
         event.stopPropagation();
+        positionDropdown();
         settingsDropdown.classList.toggle("active");
     });
 
@@ -217,5 +227,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     settingsDropdown.addEventListener("click", function (event) {
         event.stopPropagation();
+    });
+
+    // Re-position on resize in case the button moves
+    window.addEventListener("resize", function () {
+        if (settingsDropdown.classList.contains("active")) {
+            positionDropdown();
+        }
     });
 });
