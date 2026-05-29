@@ -75,6 +75,32 @@
                         <h2>Clients</h2>
                         <span class="tables-record-count" id="clientCount">Loading…</span>
                     </div>
+
+                    <!-- Action bar: shown only when rows are selected -->
+                    <div id="clientActionBar" style="display:none; padding:10px 16px; background:var(--bg-card); border-bottom:1px solid var(--border); display:none; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <span id="clientSelectedCount" style="font-size:13px; font-weight:600; color:var(--primary); min-width:90px;"></span>
+
+                        <select id="bulkAlgo" class="form-control" style="width:120px; font-size:13px;">
+                            <option value="">Algo…</option>
+                        </select>
+                        <select id="bulkServer" class="form-control" style="width:120px; font-size:13px;">
+                            <option value="">Server…</option>
+                        </select>
+                        <input id="bulkDealerID" class="form-control" type="text" maxlength="30" placeholder="DealerID…" style="width:130px; font-size:13px;">
+                        <select id="bulkAccType" class="form-control" style="width:140px; font-size:13px;">
+                            <option value="">Acc Type…</option>
+                            <option value="Client">Client</option>
+                            <option value="PS_Personal">PS_Personal</option>
+                            <option value="RD_Personal">RD_Personal</option>
+                            <option value="VT_Personal">VT_Personal</option>
+                            <option value="GB_Personal">GB_Personal</option>
+                        </select>
+
+                        <button id="clientBulkUpdateBtn" class="btn btn-primary" style="font-size:13px;">Apply to Selected</button>
+                        <button id="clientDeleteBtn" class="btn" style="font-size:13px; background:var(--danger, #ef4444); color:#fff; border:none; padding:6px 14px; border-radius:6px; cursor:pointer;">🗑 Delete Selected</button>
+                        <span id="clientActionResult" style="font-size:12px; margin-left:4px;"></span>
+                    </div>
+
                     <div id="clientTableArea">
                         <div class="table-loading">Loading client data…</div>
                     </div>
@@ -93,8 +119,13 @@
 
                 <!-- ── Server Mapping tab ────────────────────── -->
                 <div id="tab-server-mapping" class="tables-tab-content">
-                    <div class="tables-header"><h2>Server Mapping</h2></div>
-                    <div class="table-empty">Coming soon.</div>
+                    <div class="tables-header">
+                        <h2>Server Mapping</h2>
+                        <span class="tables-record-count" id="serverMappingCount"></span>
+                    </div>
+                    <div id="serverMappingTableArea">
+                        <div class="table-loading">Click the tab to load server mapping…</div>
+                    </div>
                 </div>
 
             </div>
@@ -142,6 +173,9 @@
                 pane.classList.add("active");
                 if (btn.getAttribute("data-target") === "tab-server-config" && !serverLoaded) {
                     loadServerConfig();
+                }
+                if (btn.getAttribute("data-target") === "tab-server-mapping" && !serverMappingLoaded) {
+                    loadServerMapping();
                 }
             });
         });
@@ -505,6 +539,57 @@
             });
         }
 
+        // ── Server Mapping table ──────────────────────────────────
+        var serverMappingLoaded = false;
+
+        function loadServerMapping() {
+            document.getElementById("serverMappingTableArea").innerHTML =
+                "<div class='table-loading'>Loading server mapping…</div>";
+
+            Promise.all([
+                fetch("/api/server-info").then(function (r) { return r.json(); }),
+                fetch("/api/operators").then(function (r) { return r.json(); })
+            ]).then(function (results) {
+                var sRes = results[0];
+                var oRes = results[1];
+
+                if (!sRes.success) {
+                    document.getElementById("serverMappingTableArea").innerHTML =
+                        "<div class='table-error'>" + esc(sRes.error || "Could not load data.") + "</div>";
+                    return;
+                }
+
+                var operatorOptions = (oRes.success && oRes.operators) ? oRes.operators : [];
+
+                var algoOptions = [];
+                (sRes.servers || []).forEach(function (s) {
+                    var a = (s["Algo"] || "").trim();
+                    if (a && algoOptions.indexOf(a) === -1) algoOptions.push(a);
+                });
+                algoOptions.sort();
+
+                var serverMappingTable = new InlineTable({
+                    areaId:    "serverMappingTableArea",
+                    countId:   "serverMappingCount",
+                    pkField:   "Server",
+                    pkParam:   "server",
+                    apiUpdate: "/api/server-info/update-field",
+                    columns:   ["Server", "Algo", "Operator"],
+                    readonlyAuto: ["Server"],
+                    editable: {
+                        "Algo":     { type: "select", options: algoOptions },
+                        "Operator": { type: "select", options: operatorOptions }
+                    }
+                });
+
+                serverMappingLoaded = true;
+                serverMappingTable.render(sRes.servers || []);
+            }).catch(function () {
+                document.getElementById("serverMappingTableArea").innerHTML =
+                    "<div class='table-error'>Network error. Could not load server mapping.</div>";
+            });
+        }
+
         // ── Client table ──────────────────────────────────────────
         (function initClientTab() {
             Promise.all([
@@ -524,6 +609,13 @@
                 var serverNames = (sRes.success && sRes.servers)
                     ? sRes.servers.map(function (s) { return s.Server; }) : [];
 
+                // Populate bulk-update server dropdown
+                serverNames.forEach(function (s) {
+                    var o = document.createElement("option");
+                    o.value = s; o.textContent = s;
+                    document.getElementById("bulkServer").appendChild(o);
+                });
+
                 var clientTable = new InlineTable({
                     areaId:    "clientTableArea",
                     countId:   "clientCount",
@@ -533,16 +625,17 @@
                     columns: [
                         "userId", "alias", "Broker", "server",
                         "algo", "Running Type", "Operator Name",
-                        "Category", "SubCategory", "Acc Type"
+                        "Category", "SubCategory", "Acc Type", "DealerID"
                     ],
                     editable: {
-                        "alias":        { type: "text",   maxlength: 30 },
+                        "alias":        { type: "text",   maxlength: 50 },
                         "server":       { type: "select", options: serverNames },
                         "algo":         { type: "text",   maxlength: 10 },
                         "Running Type": { type: "select", options: ["INT", "POS"] },
                         "Acc Type":     { type: "select", options: [
                             "Client", "PS_Personal", "RD_Personal", "VT_Personal", "GB_Personal"
-                        ]}
+                        ]},
+                        "DealerID":     { type: "text",   maxlength: 30 }
                     },
                     readonlyAuto: ["Operator Name"],
                     onAfterSave: function (td, col, newVal, data, tr) {
@@ -554,10 +647,125 @@
                                 flashCell(opTd);
                             }
                         }
+                        updateClientActionBar();
                     }
                 });
 
                 clientTable.render(cRes.clients || []);
+
+                // Populate algo options from loaded data
+                var algoSet = {};
+                (cRes.clients || []).forEach(function (c) {
+                    var a = (c["algo"] || "").trim();
+                    if (a) algoSet[a] = true;
+                });
+                Object.keys(algoSet).sort().forEach(function (a) {
+                    var o = document.createElement("option");
+                    o.value = a; o.textContent = a;
+                    document.getElementById("bulkAlgo").appendChild(o);
+                });
+
+                // ── Action bar logic ──────────────────────────────
+                function getCheckedPks() {
+                    var pks = [];
+                    document.querySelectorAll("#clientTableArea .row-chk:checked").forEach(function (chk) {
+                        pks.push(chk.getAttribute("data-pk"));
+                    });
+                    return pks;
+                }
+
+                function updateClientActionBar() {
+                    var pks = getCheckedPks();
+                    var bar = document.getElementById("clientActionBar");
+                    var cnt = document.getElementById("clientSelectedCount");
+                    if (pks.length > 0) {
+                        bar.style.display = "flex";
+                        cnt.textContent = pks.length + " selected";
+                    } else {
+                        bar.style.display = "none";
+                        cnt.textContent = "";
+                    }
+                    document.getElementById("clientActionResult").textContent = "";
+                }
+
+                function setActionResult(msg, success) {
+                    var el = document.getElementById("clientActionResult");
+                    el.textContent = msg;
+                    el.style.color = success ? "var(--success, #16a34a)" : "var(--danger, #ef4444)";
+                }
+
+                document.getElementById("clientTableArea").addEventListener("change", function (e) {
+                    if (e.target && (e.target.classList.contains("row-chk") || e.target.classList.contains("chk-all"))) {
+                        setTimeout(updateClientActionBar, 0);
+                    }
+                });
+
+                document.getElementById("clientDeleteBtn").addEventListener("click", function () {
+                    var pks = getCheckedPks();
+                    if (!pks.length) return;
+                    if (!confirm("Delete " + pks.length + " selected client(s)? This cannot be undone.")) return;
+                    fetch("/api/clients/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userIds: pks })
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            setActionResult(data.message, true);
+                            pks.forEach(function (pk) {
+                                var tr = document.querySelector("#clientTableArea tr[data-pk='" + pk + "']");
+                                if (tr) tr.remove();
+                            });
+                            var remaining = document.querySelectorAll("#clientTableArea tbody tr").length;
+                            document.getElementById("clientCount").textContent = remaining + " records";
+                            updateClientActionBar();
+                        } else {
+                            setActionResult(data.error || "Delete failed.", false);
+                        }
+                    })
+                    .catch(function () { setActionResult("Network error.", false); });
+                });
+
+                document.getElementById("clientBulkUpdateBtn").addEventListener("click", function () {
+                    var pks = getCheckedPks();
+                    if (!pks.length) return;
+                    var fields = {
+                        algo:          document.getElementById("bulkAlgo").value,
+                        server:        document.getElementById("bulkServer").value,
+                        DealerID:      document.getElementById("bulkDealerID").value.trim(),
+                        "Acc Type":    document.getElementById("bulkAccType").value
+                    };
+                    Object.keys(fields).forEach(function (k) { if (!fields[k]) delete fields[k]; });
+                    if (!Object.keys(fields).length) {
+                        setActionResult("Select at least one field to update.", false);
+                        return;
+                    }
+                    fetch("/api/clients/bulk-update", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userIds: pks, fields: fields })
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.success) {
+                            setActionResult(data.message, true);
+                            document.getElementById("clientTableArea").innerHTML = "<div class='table-loading'>Reloading…</div>";
+                            document.getElementById("clientCount").textContent = "Loading…";
+                            Promise.all([
+                                fetch("/api/clients").then(function(r){return r.json();}),
+                                fetch("/api/servers").then(function(r){return r.json();})
+                            ]).then(function(res){
+                                if (res[0].success) clientTable.render(res[0].clients || []);
+                                document.getElementById("clientActionBar").style.display = "none";
+                            });
+                        } else {
+                            setActionResult(data.error || "Update failed.", false);
+                        }
+                    })
+                    .catch(function () { setActionResult("Network error.", false); });
+                });
+
             }).catch(function () {
                 document.getElementById("clientTableArea").innerHTML =
                     "<div class='table-error'>Network error. Could not load client data.</div>";
@@ -567,7 +775,6 @@
 
     }());
     </script>
-
 
 </body>
 </html>

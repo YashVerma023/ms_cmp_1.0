@@ -47,7 +47,20 @@
         <!-- ── Page Body ─────────────────────────────────────────── -->
         <div class="acp-body">
 
-            <!-- ── Left Sidebar ──────────────────────────────────── -->
+            <!-- ── Main Nav Sidebar ──────────────────────────────── -->
+            <nav class="sidebar">
+                <span class="sidebar-label">Navigation</span>
+                <a href="{{ url_for('superadmin_dashboard') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊞</span>
+                    Dashboard
+                </a>
+                <a href="{{ url_for('superadmin_tables') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊟</span>
+                    Tables
+                </a>
+            </nav>
+
+            <!-- ── Admin Control Sidebar ─────────────────────────── -->
             <nav class="acp-sidebar">
                 <div class="acp-sidebar-header">
                     <p class="acp-sidebar-title">Admin Panel</p>
@@ -62,6 +75,9 @@
                     </button>
                     <button class="acp-nav-item" data-acp="add-client">
                         <span class="acp-nav-icon">👥</span> Add Client
+                    </button>
+                    <button class="acp-nav-item" data-acp="bulk-upload">
+                        <span class="acp-nav-icon">📤</span> Bulk Upload
                     </button>
                     <button class="acp-nav-item" data-acp="add-server">
                         <span class="acp-nav-icon">🖥️</span> Add Server
@@ -334,6 +350,53 @@
                 </div>
 
 
+                <!-- ══ Bulk Upload ═══════════════════════════════ -->
+                <div id="acp-bulk-upload" class="acp-section">
+                    <div class="acp-section-header">
+                        <h2 class="acp-section-title">Bulk Upload</h2>
+                        <p class="acp-section-subtitle">Upload clients or servers in bulk via .xlsx. Download a template first if needed.</p>
+                    </div>
+
+                    <div class="acp-form-card" style="margin-bottom:16px;">
+                        <p style="font-size:13px;font-weight:600;color:var(--text-main);margin:0 0 12px;">Clients</p>
+                        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Existing User IDs will be updated.</p>
+                        <div id="bulkClientResult" class="result-box" style="display:none;"></div>
+                        <form id="bulkClientForm" autocomplete="off" novalidate>
+                            <div class="field-row">
+                                <label class="field-label">File <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="file" name="file" accept=".xlsx" required>
+                                    <small class="form-hint">Only .xlsx files accepted.</small>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:10px;">
+                                <button type="submit" class="btn btn-primary" style="flex:1;" id="bulkClientSubmitBtn">Upload Clients</button>
+                                <a href="/admin-panel/download-client-template" class="btn btn-secondary" style="flex:1;text-align:center;text-decoration:none;">⬇ Template</a>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="acp-form-card">
+                        <p style="font-size:13px;font-weight:600;color:var(--text-main);margin:0 0 12px;">Servers</p>
+                        <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;">Duplicate server codes will be skipped.</p>
+                        <div id="bulkServerResult" class="result-box" style="display:none;"></div>
+                        <form id="bulkServerForm" autocomplete="off" novalidate>
+                            <div class="field-row">
+                                <label class="field-label">File <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="file" name="file" accept=".xlsx" required>
+                                    <small class="form-hint">Only .xlsx files accepted.</small>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:10px;">
+                                <button type="submit" class="btn btn-primary" style="flex:1;" id="bulkServerSubmitBtn">Upload Servers</button>
+                                <a href="/admin-panel/download-server-template" class="btn btn-secondary" style="flex:1;text-align:center;text-decoration:none;">⬇ Template</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+
                 <!-- ══ View User ══════════════════════════════════ -->
                 <div id="acp-view-user" class="acp-section" style="max-width:100%;">
                     <div class="acp-section-header">
@@ -352,18 +415,37 @@
 
                 <!-- ══ Grouping Setting ═══════════════════════════ -->
                 <div id="acp-grouping-setting" class="acp-section">
-                    <div class="acp-section-header">
-                        <h2 class="acp-section-title">Grouping Setting</h2>
-                        <p class="acp-section-subtitle">Configure client grouping rules and categories.</p>
+                    <div class="acp-section-header" style="display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <h2 class="acp-section-title">Grouping Setting</h2>
+                            <p class="acp-section-subtitle">Define and manage client category groups.</p>
+                        </div>
+                        <button id="grpAddBtn" class="btn btn-primary" style="white-space:nowrap;">+ Add Group</button>
                     </div>
-                    <div class="acp-coming-soon">
-                        <div class="acp-coming-soon-icon">⚙️</div>
-                        <div class="acp-coming-soon-title">Coming Soon</div>
-                        <p class="acp-coming-soon-text">
-                            Grouping settings will let you define custom categories,
-                            sub-categories, and grouping logic for client classification.
-                        </p>
-                        <span class="acp-badge-soon">In Development</span>
+                    <div id="grpResult" class="result-box" style="display:none;margin-bottom:12px;"></div>
+                    <div id="grpTableArea" style="overflow-x:auto;"></div>
+                </div>
+
+                <!-- Group Add/Edit Modal -->
+                <div id="grpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;">
+                    <div style="background:var(--bg-card,#1e2430);border-radius:10px;padding:28px 32px;min-width:360px;max-width:500px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.5);">
+                        <h3 id="grpModalTitle" style="margin:0 0 20px;font-size:1.1rem;color:var(--text-primary,#e2e8f0);">Add Group</h3>
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block;margin-bottom:6px;font-size:.85rem;color:var(--text-muted,#94a3b8);">Group Name</label>
+                            <input id="grpModalName" type="text" maxlength="30" placeholder="e.g. Premium Clients"
+                                style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:6px;border:1px solid var(--border-color,#334155);background:var(--bg-input,#0f172a);color:var(--text-primary,#e2e8f0);font-size:.9rem;">
+                        </div>
+                        <div style="margin-bottom:20px;">
+                            <label style="display:block;margin-bottom:6px;font-size:.85rem;color:var(--text-muted,#94a3b8);">Group Definition <span style="font-size:.78rem;color:var(--text-muted,#94a3b8);">(select categories)</span></label>
+                            <div id="grpModalCats" style="max-height:180px;overflow-y:auto;border:1px solid var(--border-color,#334155);border-radius:6px;padding:8px 12px;background:var(--bg-input,#0f172a);display:flex;flex-wrap:wrap;gap:8px;">
+                                <span style="color:var(--text-muted,#94a3b8);font-size:.85rem;">Loading categories…</span>
+                            </div>
+                        </div>
+                        <div id="grpModalErr" style="display:none;color:#f87171;font-size:.85rem;margin-bottom:12px;"></div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end;">
+                            <button id="grpModalCancel" class="btn" style="background:var(--bg-hover,#334155);color:var(--text-primary,#e2e8f0);">Cancel</button>
+                            <button id="grpModalSave" class="btn btn-primary">Save</button>
+                        </div>
                     </div>
                 </div>
 
@@ -464,237 +546,207 @@
         bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
         bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
 
+        /* ── Bulk upload forms (file uploads — use FormData directly) ── */
+        function bindFileForm(formId, url, btnId, resultId, defaultLabel) {
+            var form = document.getElementById(formId);
+            if (!form) return;
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var fileInput = form.querySelector("input[type=file]");
+                if (!fileInput || !fileInput.files.length) {
+                    showResult(resultId, false, "Please select a file to upload.");
+                    return;
+                }
+                hideResult(resultId);
+                setBtn(btnId, true, "Uploading…");
+                var fd = new FormData();
+                fd.append("file", fileInput.files[0]);
+                fetch(url, { method: "POST", body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        var msg = data.message || data.error || (data.success ? "Upload complete." : "Upload failed.");
+                        if (data.success && data.errors && data.errors.length) {
+                            msg += " Rows with errors: " + data.errors.map(function(e){ return "Row " + e.row + " (" + e.error + ")"; }).join("; ");
+                        }
+                        showResult(resultId, data.success, msg);
+                        if (data.success) form.reset();
+                    })
+                    .catch(function () { showResult(resultId, false, "Network error. Please try again."); })
+                    .finally(function () { setBtn(btnId, false, defaultLabel); });
+            });
+        }
 
-        /* ══ View User InlineTable ═══════════════════════════ */
-        var viewUserLoaded = false;
-        var viewUserArea   = document.getElementById("viewUserTableArea");
-        var VU_COLUMNS     = ["email", "role", "name", "ops_name", "password"];
-        var VU_EDITABLE    = { "role": "select", "name": "text", "ops_name": "text", "password": "text" };
-        var VU_ROLES       = ["superadmin", "admin", "data", "operator"];
-        var vuRows = [], vuFilter = {}, vuSearch = "", vuSortCol = null, vuSortDir = 1, vuChecked = {};
+        bindFileForm("bulkClientForm", "/admin-panel/bulk-upload-clients", "bulkClientSubmitBtn", "bulkClientResult", "Upload Clients");
+        bindFileForm("bulkServerForm", "/admin-panel/bulk-upload-servers", "bulkServerSubmitBtn", "bulkServerResult", "Upload Servers");
 
-        function vuGetFiltered() {
-            var rows = vuRows.slice();
-            if (vuSearch) {
-                var q = vuSearch.toLowerCase();
-                rows = rows.filter(function (r) {
-                    return VU_COLUMNS.some(function (c) {
-                        return String(r[c] != null ? r[c] : "").toLowerCase().indexOf(q) !== -1;
-                    });
-                });
+
+        /* ══ Grouping Setting ════════════════════════════════ */
+        var grpRows = [];
+        var grpEditingName = null; /* null = add mode, string = edit mode */
+        var grpCategories  = [];
+
+        function grpShowResult(success, msg) {
+            var box = document.getElementById("grpResult");
+            if (!box) return;
+            box.style.display = "block";
+            box.className = "result-box " + (success ? "result-success" : "result-error");
+            box.innerHTML = "<strong>" + esc(msg) + "</strong>";
+            setTimeout(function () { box.style.display = "none"; }, 4000);
+        }
+
+        function grpRender(rows) {
+            grpRows = rows;
+            var area = document.getElementById("grpTableArea");
+            if (!area) return;
+            if (!rows.length) {
+                area.innerHTML = "<p style='color:var(--text-muted,#94a3b8);padding:20px 0;'>No groups yet. Click <strong>+ Add Group</strong> to create one.</p>";
+                return;
             }
-            Object.keys(vuFilter).forEach(function (col) {
-                var q = (vuFilter[col] || "").toLowerCase();
-                if (!q) return;
-                rows = rows.filter(function (r) {
-                    return String(r[col] != null ? r[col] : "").toLowerCase().indexOf(q) !== -1;
+            var html = "<table class='data-table' style='width:100%;'>";
+            html += "<thead><tr><th>Group Name</th><th>Group Definition</th><th style='width:100px;text-align:center;'>Actions</th></tr></thead><tbody>";
+            rows.forEach(function (r) {
+                html += "<tr data-grp='" + esc(r.group_name) + "'>";
+                html += "<td>" + esc(r.group_name) + "</td>";
+                html += "<td>" + esc(r.group_def) + "</td>";
+                html += "<td style='text-align:center;'>";
+                html += "<button class='btn btn-sm grp-edit-btn' data-name='" + esc(r.group_name) + "' data-def='" + esc(r.group_def) + "' style='margin-right:6px;'>Edit</button>";
+                html += "<button class='btn btn-sm grp-del-btn' data-name='" + esc(r.group_name) + "' style='background:#ef4444;color:#fff;'>Delete</button>";
+                html += "</td></tr>";
+            });
+            html += "</tbody></table>";
+            area.innerHTML = html;
+
+            area.querySelectorAll(".grp-edit-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    grpOpenModal(btn.getAttribute("data-name"), btn.getAttribute("data-def"));
                 });
             });
-            if (vuSortCol) {
-                rows.sort(function (a, b) {
-                    var av = String(a[vuSortCol] != null ? a[vuSortCol] : "");
-                    var bv = String(b[vuSortCol] != null ? b[vuSortCol] : "");
-                    return vuSortDir * av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
-                });
-            }
-            return rows;
-        }
-
-        function vuBuildRows(rows) {
-            if (!rows.length) return "<tr><td colspan='" + (VU_COLUMNS.length + 1) + "' style='text-align:center;padding:32px;color:var(--text-muted);'>No users found.</td></tr>";
-            return rows.map(function (row) {
-                var pk = row["email"] || "";
-                var html = "<tr data-pk='" + esc(pk) + "'>";
-                html += "<td class='col-check'><input type='checkbox' class='vu-row-chk'" + (vuChecked[pk] ? " checked" : "") + "></td>";
-                VU_COLUMNS.forEach(function (col) {
-                    var val = row[col] != null ? String(row[col]) : "";
-                    if (VU_EDITABLE[col]) {
-                        html += "<td class='cell-editable' data-col='" + esc(col) + "' data-val='" + esc(val) + "'>" + esc(val) + "</td>";
-                    } else {
-                        html += "<td class='cell-readonly'>" + esc(val) + "</td>";
-                    }
-                });
-                return html + "</tr>";
-            }).join("");
-        }
-
-        function vuSyncSelectAll() {
-            var allChk = viewUserArea.querySelector(".vu-all-chk");
-            var rowChks = viewUserArea.querySelectorAll(".vu-row-chk");
-            if (!allChk || !rowChks.length) return;
-            var n = 0;
-            rowChks.forEach(function (c) { if (c.checked) n++; });
-            allChk.indeterminate = n > 0 && n < rowChks.length;
-            allChk.checked = n === rowChks.length;
-        }
-
-        function vuAttachRowChk() {
-            viewUserArea.querySelectorAll(".vu-row-chk").forEach(function (chk) {
-                chk.addEventListener("change", function () {
-                    var pk = (chk.closest("tr") || {}).getAttribute("data-pk");
-                    if (pk) { if (chk.checked) vuChecked[pk] = true; else delete vuChecked[pk]; }
-                    vuSyncSelectAll();
+            area.querySelectorAll(".grp-del-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var name = btn.getAttribute("data-name");
+                    if (!confirm("Delete group \"" + name + "\"?")) return;
+                    fetch("/api/groups/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ group_name: name })
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.success) { grpLoad(); grpShowResult(true, "Group deleted."); }
+                        else grpShowResult(false, d.error || "Delete failed.");
+                    })
+                    .catch(function () { grpShowResult(false, "Network error."); });
                 });
             });
         }
 
-        function vuApplyFilters() {
-            var tbody = viewUserArea.querySelector("tbody");
-            if (tbody) {
-                tbody.innerHTML = vuBuildRows(vuGetFiltered());
-                vuAttachRowChk();
-                vuSyncSelectAll();
-                vuAttachEditListeners();
-            }
-        }
-
-        function vuRender(rows) {
-            vuRows = rows;
-            function arrowFor(col) {
-                if (vuSortCol !== col) return "<span class='sort-arrow'>⇅</span>";
-                return "<span class='sort-arrow'>" + (vuSortDir === 1 ? "↑" : "↓") + "</span>";
-            }
-            var html = "<div class='table-search-wrap'><input class='table-search-input' id='vu-gs' placeholder='🔍  Search all columns…' value='" + esc(vuSearch) + "'></div>";
-            html += "<div class='data-table-wrapper'><table class='data-table'><thead>";
-            html += "<tr><th class='col-check'><input type='checkbox' class='vu-all-chk'></th>";
-            VU_COLUMNS.forEach(function (col) {
-                var cls = "th-sortable" + (vuSortCol === col ? (" " + (vuSortDir === 1 ? "th-sort-asc" : "th-sort-desc")) : "");
-                html += "<th class='" + cls + "' data-scol='" + esc(col) + "'>" + esc(col) + arrowFor(col) + "</th>";
-            });
-            html += "</tr><tr class='filter-row'><th class='col-check'></th>";
-            VU_COLUMNS.forEach(function (col) {
-                html += "<th><input class='filter-input' data-filter-col='" + esc(col) + "' value='" + esc(vuFilter[col] || "") + "' placeholder='🔍'></th>";
-            });
-            html += "</tr></thead><tbody>" + vuBuildRows(vuGetFiltered()) + "</tbody></table></div>";
-            viewUserArea.innerHTML = html;
-
-            document.getElementById("vu-gs").addEventListener("input", function () {
-                vuSearch = this.value; vuApplyFilters();
-            });
-            viewUserArea.querySelectorAll("th.th-sortable").forEach(function (th) {
-                th.addEventListener("click", function () {
-                    var col = th.getAttribute("data-scol");
-                    if (vuSortCol === col) vuSortDir = -vuSortDir;
-                    else { vuSortCol = col; vuSortDir = 1; }
-                    vuRender(vuRows);
-                });
-            });
-            var allChk = viewUserArea.querySelector(".vu-all-chk");
-            if (allChk) {
-                allChk.addEventListener("change", function () {
-                    viewUserArea.querySelectorAll(".vu-row-chk").forEach(function (c) {
-                        c.checked = allChk.checked;
-                        var pk = (c.closest("tr") || {}).getAttribute("data-pk");
-                        if (pk) { if (allChk.checked) vuChecked[pk] = true; else delete vuChecked[pk]; }
-                    });
-                    vuSyncSelectAll();
-                });
-            }
-            viewUserArea.querySelectorAll(".filter-input").forEach(function (inp) {
-                inp.addEventListener("input", function () {
-                    vuFilter[inp.getAttribute("data-filter-col")] = inp.value;
-                    vuApplyFilters();
-                });
-            });
-            vuAttachRowChk();
-            vuSyncSelectAll();
-            vuAttachEditListeners();
-        }
-
-        function vuAttachEditListeners() {
-            viewUserArea.querySelectorAll("td.cell-editable").forEach(function (td) {
-                td.addEventListener("dblclick", function () { vuStartEdit(td); });
-            });
-        }
-
-        function vuStartEdit(td) {
-            if (td.classList.contains("cell-editing")) return;
-            var col = td.getAttribute("data-col");
-            var val = td.getAttribute("data-val") || td.textContent.trim();
-            td.classList.add("cell-editing");
-            td.innerHTML = "";
-            var input;
-            if (VU_EDITABLE[col] === "select") {
-                input = document.createElement("select");
-                input.className = "cell-edit-select";
-                VU_ROLES.forEach(function (r) {
-                    var o = document.createElement("option");
-                    o.value = r; o.textContent = r;
-                    if (r === val) o.selected = true;
-                    input.appendChild(o);
-                });
-            } else {
-                input = document.createElement("input");
-                input.type = "text"; input.className = "cell-edit-input"; input.value = val;
-            }
-            td.appendChild(input);
-            input.focus();
-            if (input.select) input.select();
-            function commit() {
-                var nv = input.value.trim();
-                if (nv === val) { vuCancel(td, val); return; }
-                vuSave(td, col, nv, val);
-            }
-            input.addEventListener("blur", commit);
-            input.addEventListener("keydown", function (e) {
-                if (e.key === "Enter")  input.blur();
-                if (e.key === "Escape") vuCancel(td, val);
-            });
-        }
-
-        function vuCancel(td, orig) {
-            td.classList.remove("cell-editing");
-            td.setAttribute("data-val", orig);
-            td.textContent = orig;
-        }
-
-        function vuSave(td, col, newVal, orig) {
-            var email = (td.closest("tr") || {}).getAttribute("data-pk") || "";
-            if (!email) { vuCancel(td, orig); return; }
-            var fd = new FormData();
-            fd.append("email", email); fd.append("field", col); fd.append("value", newVal);
-            fetch("/api/users/update-field", { method: "POST", body: fd })
+        function grpLoad() {
+            fetch("/api/groups")
                 .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.success) {
-                        td.classList.remove("cell-editing");
-                        td.setAttribute("data-val", newVal);
-                        td.textContent = newVal;
-                        td.classList.remove("cell-saved"); void td.offsetWidth; td.classList.add("cell-saved");
-                        showResult("viewUserResult", true, "Saved.");
-                        var idx = vuRows.findIndex(function (r) { return r["email"] === email; });
-                        if (idx !== -1) vuRows[idx][col] = newVal;
-                    } else {
-                        showResult("viewUserResult", false, data.error || "Could not save.");
-                        vuCancel(td, orig);
-                    }
-                })
-                .catch(function () { showResult("viewUserResult", false, "Network error."); vuCancel(td, orig); });
+                .then(function (d) { if (d.success) grpRender(d.groups); })
+                .catch(function () { grpShowResult(false, "Failed to load groups."); });
         }
 
-        function loadViewUser() {
-            viewUserArea.innerHTML = "<div class='table-loading'>Loading users…</div>";
-            fetch("/api/users")
+        function grpLoadCategories(cb) {
+            if (grpCategories.length) { cb(grpCategories); return; }
+            fetch("/api/categories")
                 .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (!data.success) {
-                        viewUserArea.innerHTML = "<div class='table-error'>" + esc(data.error || "Could not load users.") + "</div>";
-                        return;
-                    }
-                    viewUserLoaded = true;
-                    vuRender(data.users || []);
+                .then(function (d) {
+                    if (d.success) { grpCategories = d.categories; cb(grpCategories); }
+                    else cb([]);
                 })
-                .catch(function () {
-                    viewUserArea.innerHTML = "<div class='table-error'>Network error.</div>";
-                });
+                .catch(function () { cb([]); });
         }
 
-        if (!Array.prototype.findIndex) {
-            Array.prototype.findIndex = function (fn) {
-                for (var i = 0; i < this.length; i++) { if (fn(this[i])) return i; }
-                return -1;
-            };
+        function grpOpenModal(editName, editDef) {
+            grpEditingName = editName || null;
+            var modal = document.getElementById("grpModal");
+            var titleEl = document.getElementById("grpModalTitle");
+            var nameInput = document.getElementById("grpModalName");
+            var errEl = document.getElementById("grpModalErr");
+            var catsEl = document.getElementById("grpModalCats");
+
+            titleEl.textContent = grpEditingName ? "Edit Group" : "Add Group";
+            nameInput.value = grpEditingName || "";
+            nameInput.readOnly = !!grpEditingName;
+            nameInput.style.opacity = grpEditingName ? "0.6" : "1";
+            errEl.style.display = "none";
+            catsEl.innerHTML = "<span style='color:var(--text-muted,#94a3b8);font-size:.85rem;'>Loading…</span>";
+            modal.style.display = "flex";
+
+            var selectedDefs = editDef ? editDef.split(",").map(function (s) { return s.trim(); }) : [];
+            grpLoadCategories(function (cats) {
+                if (!cats.length) {
+                    catsEl.innerHTML = "<span style='color:var(--text-muted,#94a3b8);font-size:.85rem;'>No categories found in clients table.</span>";
+                    return;
+                }
+                catsEl.innerHTML = cats.map(function (cat) {
+                    var checked = selectedDefs.indexOf(cat) !== -1 ? " checked" : "";
+                    return "<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.87rem;color:var(--text-primary,#e2e8f0);'>" +
+                        "<input type='checkbox' value='" + esc(cat) + "'" + checked + " style='accent-color:var(--accent,#3b82f6);'>" +
+                        esc(cat) + "</label>";
+                }).join("");
+            });
         }
+
+        function grpCloseModal() {
+            document.getElementById("grpModal").style.display = "none";
+        }
+
+        document.getElementById("grpAddBtn").addEventListener("click", function () {
+            grpOpenModal(null, null);
+        });
+        document.getElementById("grpModalCancel").addEventListener("click", grpCloseModal);
+        document.getElementById("grpModal").addEventListener("click", function (e) {
+            if (e.target === this) grpCloseModal();
+        });
+
+        document.getElementById("grpModalSave").addEventListener("click", function () {
+            var nameInput = document.getElementById("grpModalName");
+            var errEl = document.getElementById("grpModalErr");
+            var saveBtn = document.getElementById("grpModalSave");
+            var name = nameInput.value.trim();
+            var checked = document.querySelectorAll("#grpModalCats input[type=checkbox]:checked");
+            var defs = Array.prototype.map.call(checked, function (c) { return c.value; });
+
+            errEl.style.display = "none";
+            if (!name) { errEl.textContent = "Group name is required."; errEl.style.display = "block"; return; }
+            if (!defs.length) { errEl.textContent = "Select at least one category."; errEl.style.display = "block"; return; }
+
+            var defStr = defs.join(", ");
+            if (defStr.length > 50) { errEl.textContent = "Selection too long (max 50 chars). Select fewer categories."; errEl.style.display = "block"; return; }
+
+            saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+            var url = grpEditingName ? "/api/groups/update" : "/api/groups/add";
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ group_name: name, group_def: defStr })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.success) {
+                    grpCloseModal();
+                    grpLoad();
+                    grpShowResult(true, grpEditingName ? "Group updated." : "Group added.");
+                } else {
+                    errEl.textContent = d.error || "Save failed.";
+                    errEl.style.display = "block";
+                }
+            })
+            .catch(function () { errEl.textContent = "Network error."; errEl.style.display = "block"; })
+            .finally(function () { saveBtn.disabled = false; saveBtn.textContent = "Save"; });
+        });
+
+        /* Load groups when section becomes active */
+        var grpLoaded = false;
+        navBtns.forEach(function (btn) {
+            if (btn.getAttribute("data-acp") === "grouping-setting") {
+                btn.addEventListener("click", function () {
+                    if (!grpLoaded) { grpLoaded = true; grpLoad(); }
+                });
+            }
+        });
 
     }());
     </script>

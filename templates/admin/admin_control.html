@@ -47,7 +47,20 @@
         <!-- ── Page Body ─────────────────────────────────────────── -->
         <div class="acp-body">
 
-            <!-- ── Left Sidebar ──────────────────────────────────── -->
+            <!-- ── Main Nav Sidebar ──────────────────────────────── -->
+            <nav class="sidebar">
+                <span class="sidebar-label">Navigation</span>
+                <a href="{{ url_for('admin_dashboard') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊞</span>
+                    Dashboard
+                </a>
+                <a href="{{ url_for('admin_tables') }}" class="sidebar-item">
+                    <span class="sidebar-icon">⊟</span>
+                    Tables
+                </a>
+            </nav>
+
+            <!-- ── Admin Control Sidebar ─────────────────────────── -->
             <nav class="acp-sidebar">
                 <div class="acp-sidebar-header">
                     <p class="acp-sidebar-title">Admin Panel</p>
@@ -267,18 +280,37 @@
 
                 <!-- ══ Grouping Setting ══════════════════════════ -->
                 <div id="acp-grouping-setting" class="acp-section">
-                    <div class="acp-section-header">
-                        <h2 class="acp-section-title">Grouping Setting</h2>
-                        <p class="acp-section-subtitle">Configure client grouping rules and categories.</p>
+                    <div class="acp-section-header" style="display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <h2 class="acp-section-title">Grouping Setting</h2>
+                            <p class="acp-section-subtitle">Define and manage client category groups.</p>
+                        </div>
+                        <button id="grpAddBtn" class="btn btn-primary" style="white-space:nowrap;">+ Add Group</button>
                     </div>
-                    <div class="acp-coming-soon">
-                        <div class="acp-coming-soon-icon">⚙️</div>
-                        <div class="acp-coming-soon-title">Coming Soon</div>
-                        <p class="acp-coming-soon-text">
-                            Grouping settings will allow you to define custom categories,
-                            sub-categories, and grouping logic for client classification.
-                        </p>
-                        <span class="acp-badge-soon">In Development</span>
+                    <div id="grpResult" class="result-box" style="display:none;margin-bottom:12px;"></div>
+                    <div id="grpTableArea" style="overflow-x:auto;"></div>
+                </div>
+
+                <!-- Group Add/Edit Modal -->
+                <div id="grpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;">
+                    <div style="background:var(--bg-card,#1e2430);border-radius:10px;padding:28px 32px;min-width:360px;max-width:500px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.5);">
+                        <h3 id="grpModalTitle" style="margin:0 0 20px;font-size:1.1rem;color:var(--text-primary,#e2e8f0);">Add Group</h3>
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block;margin-bottom:6px;font-size:.85rem;color:var(--text-muted,#94a3b8);">Group Name</label>
+                            <input id="grpModalName" type="text" maxlength="30" placeholder="e.g. Premium Clients"
+                                style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:6px;border:1px solid var(--border-color,#334155);background:var(--bg-input,#0f172a);color:var(--text-primary,#e2e8f0);font-size:.9rem;">
+                        </div>
+                        <div style="margin-bottom:20px;">
+                            <label style="display:block;margin-bottom:6px;font-size:.85rem;color:var(--text-muted,#94a3b8);">Group Definition <span style="font-size:.78rem;color:var(--text-muted,#94a3b8);">(select categories)</span></label>
+                            <div id="grpModalCats" style="max-height:180px;overflow-y:auto;border:1px solid var(--border-color,#334155);border-radius:6px;padding:8px 12px;background:var(--bg-input,#0f172a);display:flex;flex-wrap:wrap;gap:8px;">
+                                <span style="color:var(--text-muted,#94a3b8);font-size:.85rem;">Loading categories…</span>
+                            </div>
+                        </div>
+                        <div id="grpModalErr" style="display:none;color:#f87171;font-size:.85rem;margin-bottom:12px;"></div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end;">
+                            <button id="grpModalCancel" class="btn" style="background:var(--bg-hover,#334155);color:var(--text-primary,#e2e8f0);">Cancel</button>
+                            <button id="grpModalSave" class="btn btn-primary">Save</button>
+                        </div>
                     </div>
                 </div>
 
@@ -310,13 +342,13 @@
     (function () {
         "use strict";
 
-        /* ── Section navigation ──────────────────────────────────── */
+        /* ── Section navigation ────────────────────────────────── */
         var navBtns  = document.querySelectorAll(".acp-nav-item[data-acp]");
         var sections = document.querySelectorAll(".acp-section");
 
         navBtns.forEach(function (btn) {
             btn.addEventListener("click", function () {
-                navBtns.forEach(function (b) { b.classList.remove("active"); });
+                navBtns.forEach(function (b)  { b.classList.remove("active"); });
                 sections.forEach(function (s) { s.classList.remove("active"); });
                 btn.classList.add("active");
                 var target = document.getElementById("acp-" + btn.getAttribute("data-acp"));
@@ -324,7 +356,7 @@
             });
         });
 
-        /* ── Helpers ─────────────────────────────────────────────── */
+        /* ── Helpers ─────────────────────────────────────────── */
         function esc(t) {
             var d = document.createElement("div");
             d.appendChild(document.createTextNode(String(t == null ? "" : t)));
@@ -365,15 +397,181 @@
                         showResult(resultId, data.success, data.message || data.error);
                         if (data.success) form.reset();
                     })
-                    .catch(function () {
-                        showResult(resultId, false, "Network error. Please try again.");
-                    })
+                    .catch(function () { showResult(resultId, false, "Network error. Please try again."); })
                     .finally(function () { setBtn(btnId, false, defaultLabel); });
             });
         }
 
         bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
         bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
+
+
+        /* ══ Grouping Setting ════════════════════════════════ */
+        var grpRows = [];
+        var grpEditingName = null;
+        var grpCategories  = [];
+
+        function grpShowResult(success, msg) {
+            var box = document.getElementById("grpResult");
+            if (!box) return;
+            box.style.display = "block";
+            box.className = "result-box " + (success ? "result-success" : "result-error");
+            box.innerHTML = "<strong>" + esc(msg) + "</strong>";
+            setTimeout(function () { box.style.display = "none"; }, 4000);
+        }
+
+        function grpRender(rows) {
+            grpRows = rows;
+            var area = document.getElementById("grpTableArea");
+            if (!area) return;
+            if (!rows.length) {
+                area.innerHTML = "<p style='color:var(--text-muted,#94a3b8);padding:20px 0;'>No groups yet. Click <strong>+ Add Group</strong> to create one.</p>";
+                return;
+            }
+            var html = "<table class='data-table' style='width:100%;'>";
+            html += "<thead><tr><th>Group Name</th><th>Group Definition</th><th style='width:100px;text-align:center;'>Actions</th></tr></thead><tbody>";
+            rows.forEach(function (r) {
+                html += "<tr data-grp='" + esc(r.group_name) + "'>";
+                html += "<td>" + esc(r.group_name) + "</td>";
+                html += "<td>" + esc(r.group_def) + "</td>";
+                html += "<td style='text-align:center;'>";
+                html += "<button class='btn btn-sm grp-edit-btn' data-name='" + esc(r.group_name) + "' data-def='" + esc(r.group_def) + "' style='margin-right:6px;'>Edit</button>";
+                html += "<button class='btn btn-sm grp-del-btn' data-name='" + esc(r.group_name) + "' style='background:#ef4444;color:#fff;'>Delete</button>";
+                html += "</td></tr>";
+            });
+            html += "</tbody></table>";
+            area.innerHTML = html;
+
+            area.querySelectorAll(".grp-edit-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    grpOpenModal(btn.getAttribute("data-name"), btn.getAttribute("data-def"));
+                });
+            });
+            area.querySelectorAll(".grp-del-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var name = btn.getAttribute("data-name");
+                    if (!confirm("Delete group \"" + name + "\"?")) return;
+                    fetch("/api/groups/delete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ group_name: name })
+                    })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.success) { grpLoad(); grpShowResult(true, "Group deleted."); }
+                        else grpShowResult(false, d.error || "Delete failed.");
+                    })
+                    .catch(function () { grpShowResult(false, "Network error."); });
+                });
+            });
+        }
+
+        function grpLoad() {
+            fetch("/api/groups")
+                .then(function (r) { return r.json(); })
+                .then(function (d) { if (d.success) grpRender(d.groups); })
+                .catch(function () { grpShowResult(false, "Failed to load groups."); });
+        }
+
+        function grpLoadCategories(cb) {
+            if (grpCategories.length) { cb(grpCategories); return; }
+            fetch("/api/categories")
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.success) { grpCategories = d.categories; cb(grpCategories); }
+                    else cb([]);
+                })
+                .catch(function () { cb([]); });
+        }
+
+        function grpOpenModal(editName, editDef) {
+            grpEditingName = editName || null;
+            var modal = document.getElementById("grpModal");
+            var titleEl = document.getElementById("grpModalTitle");
+            var nameInput = document.getElementById("grpModalName");
+            var errEl = document.getElementById("grpModalErr");
+            var catsEl = document.getElementById("grpModalCats");
+
+            titleEl.textContent = grpEditingName ? "Edit Group" : "Add Group";
+            nameInput.value = grpEditingName || "";
+            nameInput.readOnly = !!grpEditingName;
+            nameInput.style.opacity = grpEditingName ? "0.6" : "1";
+            errEl.style.display = "none";
+            catsEl.innerHTML = "<span style='color:var(--text-muted,#94a3b8);font-size:.85rem;'>Loading...</span>";
+            modal.style.display = "flex";
+
+            var selectedDefs = editDef ? editDef.split(",").map(function (s) { return s.trim(); }) : [];
+            grpLoadCategories(function (cats) {
+                if (!cats.length) {
+                    catsEl.innerHTML = "<span style='color:var(--text-muted,#94a3b8);font-size:.85rem;'>No categories found in clients table.</span>";
+                    return;
+                }
+                catsEl.innerHTML = cats.map(function (cat) {
+                    var chk = selectedDefs.indexOf(cat) !== -1 ? " checked" : "";
+                    return "<label style='display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.87rem;color:var(--text-primary,#e2e8f0);'>" +
+                        "<input type='checkbox' value='" + esc(cat) + "'" + chk + " style='accent-color:var(--accent,#3b82f6);'>" +
+                        esc(cat) + "</label>";
+                }).join("");
+            });
+        }
+
+        function grpCloseModal() {
+            document.getElementById("grpModal").style.display = "none";
+        }
+
+        document.getElementById("grpAddBtn").addEventListener("click", function () {
+            grpOpenModal(null, null);
+        });
+        document.getElementById("grpModalCancel").addEventListener("click", grpCloseModal);
+        document.getElementById("grpModal").addEventListener("click", function (e) {
+            if (e.target === this) grpCloseModal();
+        });
+
+        document.getElementById("grpModalSave").addEventListener("click", function () {
+            var nameInput = document.getElementById("grpModalName");
+            var errEl = document.getElementById("grpModalErr");
+            var saveBtn = document.getElementById("grpModalSave");
+            var name = nameInput.value.trim();
+            var checked = document.querySelectorAll("#grpModalCats input[type=checkbox]:checked");
+            var defs = Array.prototype.map.call(checked, function (c) { return c.value; });
+
+            errEl.style.display = "none";
+            if (!name) { errEl.textContent = "Group name is required."; errEl.style.display = "block"; return; }
+            if (!defs.length) { errEl.textContent = "Select at least one category."; errEl.style.display = "block"; return; }
+
+            var defStr = defs.join(", ");
+            if (defStr.length > 50) { errEl.textContent = "Selection too long (max 50 chars). Select fewer categories."; errEl.style.display = "block"; return; }
+
+            saveBtn.disabled = true; saveBtn.textContent = "Saving...";
+            var url = grpEditingName ? "/api/groups/update" : "/api/groups/add";
+            fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ group_name: name, group_def: defStr })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.success) {
+                    grpCloseModal();
+                    grpLoad();
+                    grpShowResult(true, grpEditingName ? "Group updated." : "Group added.");
+                } else {
+                    errEl.textContent = d.error || "Save failed.";
+                    errEl.style.display = "block";
+                }
+            })
+            .catch(function () { errEl.textContent = "Network error."; errEl.style.display = "block"; })
+            .finally(function () { saveBtn.disabled = false; saveBtn.textContent = "Save"; });
+        });
+
+        var grpLoaded = false;
+        navBtns.forEach(function (btn) {
+            if (btn.getAttribute("data-acp") === "grouping-setting") {
+                btn.addEventListener("click", function () {
+                    if (!grpLoaded) { grpLoaded = true; grpLoad(); }
+                });
+            }
+        });
 
     }());
     </script>

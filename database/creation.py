@@ -83,7 +83,7 @@ SERVER_INFO_SCHEMA = {
 
 CLIENTS_SCHEMA = {
     "userId": "VARCHAR(20)",
-    "alias": "VARCHAR(30)",
+    "alias": "VARCHAR(50)",
     "Broker": "VARCHAR(20)",
     "server": "VARCHAR(10)",
     "algo": "VARCHAR(10)",
@@ -92,6 +92,13 @@ CLIENTS_SCHEMA = {
     "Category": "VARCHAR(20)",
     "SubCategory": "VARCHAR(20)",
     "Acc Type": "VARCHAR(20)",
+    "DealerID": "VARCHAR(30)",
+}
+
+
+GROUP_SCHEMA = {
+    "group_name": "VARCHAR(30)",
+    "group_def":  "VARCHAR(50)",
 }
 
 
@@ -817,6 +824,63 @@ def initialize_clients_table(
         )
 
 
+def sync_group_schema(
+    connection: pymysql.connections.Connection,
+    database_name: str,
+) -> None:
+    sync_table_schema(
+        connection=connection,
+        database_name=database_name,
+        table_name="group",
+        required_columns=GROUP_SCHEMA,
+    )
+
+
+def initialize_group_table(
+    connection: pymysql.connections.Connection,
+    database_name: str,
+) -> None:
+    """
+    Checks group table and creates/syncs it.
+    """
+
+    table_name = "group"
+
+    log_info(
+        module=MODULE_NAME,
+        action="initialize_group_table",
+        message="Checking group table",
+        status="STARTED",
+    )
+
+    if table_exists(connection, database_name, table_name):
+        log_info(
+            module=MODULE_NAME,
+            action="table_check",
+            message="Table 'group' already exists. Checking schema now.",
+            status="SUCCESS",
+        )
+        sync_group_schema(connection=connection, database_name=database_name)
+    else:
+        log_info(
+            module=MODULE_NAME,
+            action="table_check",
+            message="Table 'group' does not exist. Creating now.",
+            status="STARTED",
+        )
+        create_table_from_schema(
+            connection=connection,
+            table_name="group",
+            schema=GROUP_SCHEMA,
+        )
+        log_info(
+            module=MODULE_NAME,
+            action="create_group_table",
+            message="Table 'group' created successfully",
+            status="SUCCESS",
+        )
+
+
 def initialize_database() -> None:
     """
     Main function to initialize CMP database and required base tables.
@@ -918,6 +982,11 @@ def initialize_database() -> None:
             )
 
             initialize_clients_table(
+                connection=db_connection,
+                database_name=database_name,
+            )
+
+            initialize_group_table(
                 connection=db_connection,
                 database_name=database_name,
             )

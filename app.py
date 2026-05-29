@@ -83,6 +83,7 @@ CLIENT_FORM_COLUMNS: list[str] = [
     "Category",
     "SubCategory",
     "Acc Type",
+    "DealerID",
 ]
 
 # Columns that MUST have a value (single-add and bulk)
@@ -93,13 +94,14 @@ CLIENT_REQUIRED_BULK_COLUMNS: list[str] = ["userId", "alias", "Broker"]
 
 CLIENT_MAX_LENGTHS: dict[str, int] = {
     "userId": 20,
-    "alias": 30,
+    "alias": 50,
     "Broker": 20,
     "algo": 10,
     "Running Type": 20,
     "Category": 20,
     "SubCategory": 20,
     "Acc Type": 20,
+    "DealerID": 30,
 }
 
 # ── Server ────────────────────────────────────────────────────────────────────
@@ -310,6 +312,21 @@ def check_admin_panel_access() -> Optional[tuple]:
     return None
 
 
+def check_superadmin_access() -> Optional[tuple]:
+    """
+    Checks if the current session role is superadmin.
+
+    Returns:
+        None if access is granted.
+        JSON error tuple (Response, status_code) if denied.
+    """
+
+    if session.get("role") != "superadmin":
+        return jsonify({"success": False, "error": "Permission denied. Superadmin only."}), 403
+
+    return None
+
+
 def get_allowed_new_roles(current_role: str) -> list[str]:
     """
     Returns roles this user may assign when adding a new user.
@@ -417,8 +434,8 @@ def insert_client(
     query = """
         INSERT INTO clients
             (userId, alias, Broker, algo, `Running Type`, `Operator Name`,
-             Category, SubCategory, `Acc Type`)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+             Category, SubCategory, `Acc Type`, DealerID)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     values = (
@@ -431,6 +448,7 @@ def insert_client(
         str(client_data.get("Category", "")).strip(),
         str(client_data.get("SubCategory", "")).strip(),
         str(client_data.get("Acc Type", "")).strip(),
+        str(client_data.get("DealerID", "")).strip(),
     )
 
     with connection.cursor() as cursor:
@@ -452,7 +470,8 @@ def update_client(
             `Running Type`   = %s,
             Category       = %s,
             SubCategory    = %s,
-            `Acc Type`       = %s
+            `Acc Type`       = %s,
+            DealerID       = %s
         WHERE userId = %s
     """
     # Note: Operator Name is NOT updated here — it is system-managed
@@ -466,6 +485,7 @@ def update_client(
         str(client_data.get("Category", "")).strip(),
         str(client_data.get("SubCategory", "")).strip(),
         str(client_data.get("Acc Type", "")).strip(),
+        str(client_data.get("DealerID", "")).strip(),
         str(client_data.get("userId", "")).strip(),
     )
 
@@ -511,7 +531,7 @@ def validate_client_data(client_data: dict) -> Optional[str]:
             return error_msg
 
     # Optional fields — validate max length only when a value is supplied
-    for field in ["algo", "Running Type", "Category", "SubCategory", "Acc Type"]:
+    for field in ["algo", "Running Type", "Category", "SubCategory", "Acc Type", "DealerID"]:
         value = str(client_data.get(field, "")).strip()
         if value:
             max_len = CLIENT_MAX_LENGTHS[field]
@@ -940,11 +960,11 @@ def add_client():
 def bulk_upload_clients():
     """
     Bulk upserts clients from .xlsx. Existing userId rows are updated.
-    Access: superadmin + admin.
+    Access: superadmin only.
     Returns JSON with inserted/updated/error counts.
     """
 
-    access_error = check_admin_panel_access()
+    access_error = check_superadmin_access()
     if access_error:
         return access_error
 
@@ -1043,9 +1063,9 @@ def bulk_upload_clients():
 @app.route("/admin-panel/download-client-template", methods=["GET"])
 @login_required
 def download_client_template():
-    """Generates and serves .xlsx client upload template. Access: superadmin + admin."""
+    """Generates and serves .xlsx client upload template. Access: superadmin only."""
 
-    access_error = check_admin_panel_access()
+    access_error = check_superadmin_access()
     if access_error:
         return access_error
 
@@ -1144,10 +1164,10 @@ def bulk_upload_servers():
     """
     Bulk inserts new servers from .xlsx.
     Rows where Server already exists are SKIPPED.
-    Access: superadmin + admin.
+    Access: superadmin only.
     """
 
-    access_error = check_admin_panel_access()
+    access_error = check_superadmin_access()
     if access_error:
         return access_error
 
@@ -1255,9 +1275,9 @@ def bulk_upload_servers():
 @app.route("/admin-panel/download-server-template", methods=["GET"])
 @login_required
 def download_server_template():
-    """Generates and serves .xlsx server upload template. Access: superadmin + admin."""
+    """Generates and serves .xlsx server upload template. Access: superadmin only."""
 
-    access_error = check_admin_panel_access()
+    access_error = check_superadmin_access()
     if access_error:
         return access_error
 
@@ -1543,7 +1563,7 @@ def api_update_server_info_field():
 # Columns the tables UI is allowed to update on the clients table.
 # "server" also triggers an Operator Name sync from server_info.
 CLIENT_INLINE_EDITABLE: frozenset[str] = frozenset({
-    "alias", "server", "algo", "Running Type", "Acc Type",
+    "alias", "server", "algo", "Running Type", "Acc Type", "DealerID",
 })
 
 RUNNING_TYPE_VALUES: frozenset[str] = frozenset({"INT", "POS"})
@@ -1568,6 +1588,7 @@ CLIENT_TABLE_COLUMNS: list[str] = [
     "Category",
     "SubCategory",
     "Acc Type",
+    "DealerID",
 ]
 
 
@@ -1592,7 +1613,8 @@ def get_all_clients() -> list[dict]:
             COALESCE(s.Operator, '') AS `Operator Name`,
             c.Category,
             c.SubCategory,
-            c.`Acc Type`
+            c.`Acc Type`,
+            c.DealerID
         FROM clients c
         LEFT JOIN server_info s ON c.server = s.Server
         ORDER BY c.userId
@@ -1636,7 +1658,7 @@ def validate_inline_field(field: str, value: str) -> Optional[str]:
         return f"Field '{field}' is not editable."
 
     if field == "alias":
-        return validate_string_field(value, "alias", 30)
+        return validate_string_field(value, "alias", 50)
 
     if field == "algo":
         if len(value) > 10:
@@ -1651,6 +1673,11 @@ def validate_inline_field(field: str, value: str) -> Optional[str]:
     if field == "Acc Type":
         if value not in ACC_TYPE_VALUES:
             return f"Acc Type must be one of: {', '.join(sorted(ACC_TYPE_VALUES))}."
+        return None
+
+    if field == "DealerID":
+        if len(value) > 30:
+            return "Field 'DealerID' exceeds maximum length of 30 characters."
         return None
 
     if field == "server":
@@ -1945,6 +1972,141 @@ def api_update_client_field():
         return jsonify({"success": False, "error": "Could not save change."}), 500
 
 
+@app.route("/api/clients/delete", methods=["POST"])
+@login_required
+def api_delete_clients():
+    """
+    Deletes one or more client rows by userId.
+    Expects JSON body: { "userIds": ["id1", "id2", ...] }
+    Access: superadmin + admin.
+    """
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        data = request.get_json(silent=True) or {}
+        user_ids = data.get("userIds", [])
+
+        if not isinstance(user_ids, list) or not user_ids:
+            return jsonify({"success": False, "error": "No userIds provided."}), 400
+
+        user_ids = [str(uid).strip() for uid in user_ids if str(uid).strip()]
+
+        if not user_ids:
+            return jsonify({"success": False, "error": "No valid userIds provided."}), 400
+
+        connection = get_db_connection()
+        try:
+            placeholders = ", ".join(["%s"] * len(user_ids))
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"DELETE FROM clients WHERE userId IN ({placeholders})",
+                    tuple(user_ids),
+                )
+            deleted_count = len(user_ids)
+        finally:
+            connection.close()
+
+        log_update(module=MODULE_NAME, action="api_delete_clients",
+                   message=f"Deleted {deleted_count} client(s) by {session.get('email')}: {user_ids}",
+                   status="SUCCESS")
+
+        return jsonify({"success": True, "deleted": deleted_count,
+                        "message": f"{deleted_count} client(s) deleted."}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_delete_clients",
+                  message="Client delete failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not delete clients."}), 500
+
+
+@app.route("/api/clients/bulk-update", methods=["POST"])
+@login_required
+def api_bulk_update_clients():
+    """
+    Bulk-updates selected fields for a list of clients.
+    Expects JSON body:
+        {
+            "userIds": ["id1", "id2", ...],
+            "fields": { "algo": "X", "server": "Y", "DealerID": "Z", "Acc Type": "W" }
+        }
+    Only non-empty field values are applied.
+    Access: superadmin + admin.
+    """
+
+    access_error = check_admin_panel_access()
+    if access_error:
+        return access_error
+
+    try:
+        data = request.get_json(silent=True) or {}
+        user_ids = data.get("userIds", [])
+        fields   = data.get("fields", {})
+
+        if not isinstance(user_ids, list) or not user_ids:
+            return jsonify({"success": False, "error": "No userIds provided."}), 400
+
+        user_ids = [str(uid).strip() for uid in user_ids if str(uid).strip()]
+
+        BULK_UPDATE_ALLOWED: frozenset[str] = frozenset({"algo", "server", "DealerID", "Acc Type"})
+
+        updates = {
+            k: str(v).strip()
+            for k, v in fields.items()
+            if k in BULK_UPDATE_ALLOWED and str(v).strip() != ""
+        }
+
+        if not updates:
+            return jsonify({"success": False, "error": "No valid fields to update."}), 400
+
+        connection = get_db_connection()
+        try:
+            placeholders = ", ".join(["%s"] * len(user_ids))
+
+            if "server" in updates:
+                # Resolve Operator Name for the new server
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT Operator FROM server_info WHERE Server = %s LIMIT 1",
+                        (updates["server"],),
+                    )
+                    row = cursor.fetchone()
+                    operator_name = str(row["Operator"]).strip() if row and row.get("Operator") else ""
+                updates["Operator Name"] = operator_name
+
+            set_parts = []
+            set_values = []
+            for col, val in updates.items():
+                quoted = f"`{col}`" if " " in col else col
+                set_parts.append(f"{quoted} = %s")
+                set_values.append(val)
+
+            set_clause = ", ".join(set_parts)
+            set_values.extend(user_ids)
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"UPDATE clients SET {set_clause} WHERE userId IN ({placeholders})",
+                    tuple(set_values),
+                )
+        finally:
+            connection.close()
+
+        log_update(module=MODULE_NAME, action="api_bulk_update_clients",
+                   message=f"Bulk updated {len(user_ids)} client(s) by {session.get('email')}: fields={list(updates.keys())}",
+                   status="SUCCESS")
+
+        return jsonify({"success": True,
+                        "message": f"{len(user_ids)} client(s) updated."}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_bulk_update_clients",
+                  message="Client bulk update failed", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not bulk update clients."}), 500
+
+
 # =========================
 # Constants: Users Management (superadmin only)
 # =========================
@@ -2095,6 +2257,172 @@ def api_update_user_field():
         log_error(module=MODULE_NAME, action="api_update_user_field",
                   message="Inline user update failed", error=exc, status="FAILED")
         return jsonify({"success": False, "error": "Could not save change."}), 500
+
+
+# =========================
+# Groups API
+# =========================
+
+
+@app.route("/api/groups", methods=["GET"])
+@login_required
+def api_get_groups():
+    """Returns all rows from the `group` table ordered by group_name."""
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT group_name, group_def FROM `group` ORDER BY group_name")
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+        return jsonify({"success": True, "groups": rows}), 200
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_groups",
+                  message="Failed to fetch groups", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not fetch groups."}), 500
+
+
+@app.route("/api/categories", methods=["GET"])
+@login_required
+def api_get_categories():
+    """Returns distinct non-empty Category values from clients table."""
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DISTINCT Category FROM clients "
+                    "WHERE Category IS NOT NULL AND Category != '' "
+                    "ORDER BY Category"
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+        categories = [r["Category"] for r in rows]
+        return jsonify({"success": True, "categories": categories}), 200
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_categories",
+                  message="Failed to fetch categories", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not fetch categories."}), 500
+
+
+@app.route("/api/groups/add", methods=["POST"])
+@login_required
+def api_add_group():
+    """Inserts a new row into the `group` table. Superadmin + admin only."""
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        group_name = str(data.get("group_name", "")).strip()
+        group_def = str(data.get("group_def", "")).strip()
+
+        if not group_name:
+            return jsonify({"success": False, "error": "group_name is required."}), 400
+        if len(group_name) > 30:
+            return jsonify({"success": False, "error": "group_name max 30 chars."}), 400
+        if not group_def:
+            return jsonify({"success": False, "error": "group_def is required."}), 400
+        if len(group_def) > 50:
+            return jsonify({"success": False, "error": "group_def max 50 chars."}), 400
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO `group` (group_name, group_def) VALUES (%s, %s)",
+                    (group_name, group_def),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+        log_added(module=MODULE_NAME, action="api_add_group",
+                  message=f"Group added by {session.get('email')}: {group_name}",
+                  status="SUCCESS")
+        return jsonify({"success": True, "message": "Group added."}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_add_group",
+                  message="Failed to add group", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not add group."}), 500
+
+
+@app.route("/api/groups/update", methods=["POST"])
+@login_required
+def api_update_group():
+    """Updates group_def for an existing group identified by group_name."""
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        group_name = str(data.get("group_name", "")).strip()
+        group_def = str(data.get("group_def", "")).strip()
+
+        if not group_name:
+            return jsonify({"success": False, "error": "group_name is required."}), 400
+        if not group_def:
+            return jsonify({"success": False, "error": "group_def is required."}), 400
+        if len(group_def) > 50:
+            return jsonify({"success": False, "error": "group_def max 50 chars."}), 400
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE `group` SET group_def = %s WHERE group_name = %s",
+                    (group_def, group_name),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+        log_update(module=MODULE_NAME, action="api_update_group",
+                   message=f"Group updated by {session.get('email')}: {group_name}",
+                   status="SUCCESS")
+        return jsonify({"success": True, "message": "Group updated."}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_update_group",
+                  message="Failed to update group", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not update group."}), 500
+
+
+@app.route("/api/groups/delete", methods=["POST"])
+@login_required
+def api_delete_group():
+    """Deletes a group by group_name."""
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        group_name = str(data.get("group_name", "")).strip()
+
+        if not group_name:
+            return jsonify({"success": False, "error": "group_name is required."}), 400
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM `group` WHERE group_name = %s", (group_name,))
+            conn.commit()
+        finally:
+            conn.close()
+
+        log_update(module=MODULE_NAME, action="api_delete_group",
+                   message=f"Group deleted by {session.get('email')}: {group_name}",
+                   status="SUCCESS")
+        return jsonify({"success": True, "message": "Group deleted."}), 200
+
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_delete_group",
+                  message="Failed to delete group", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not delete group."}), 500
 
 
 # =========================
