@@ -420,10 +420,33 @@
                             <h2 class="acp-section-title">Grouping Setting</h2>
                             <p class="acp-section-subtitle">Define and manage client category groups.</p>
                         </div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                        <button id="grpSettingsBtn" class="btn" title="Grouping Logic Settings" style="font-size:1.1rem;padding:6px 10px;background:var(--bg-hover,#334155);color:var(--text-primary,#e2e8f0);">⚙</button>
                         <button id="grpAddBtn" class="btn btn-primary" style="white-space:nowrap;">+ Add Group</button>
                     </div>
+                    </div>
                     <div id="grpResult" class="result-box" style="display:none;margin-bottom:12px;"></div>
+                    <div id="grpApplicableDisplay" style="margin-bottom:14px;display:none;">
+                        <span style="font-size:.8rem;color:var(--text-muted,#94a3b8);margin-right:8px;">Grouping applies to algos:</span>
+                        <span id="grpApplicableTags" style="display:inline-flex;flex-wrap:wrap;gap:6px;"></span>
+                    </div>
                     <div id="grpTableArea" style="overflow-x:auto;"></div>
+                </div>
+
+                <!-- Group Settings Modal -->
+                <div id="grpSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center;">
+                    <div style="background:var(--bg-card,#1e2430);border-radius:10px;padding:28px 32px;min-width:380px;max-width:520px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.5);">
+                        <h3 style="margin:0 0 6px;font-size:1.1rem;color:var(--text-primary,#e2e8f0);">Grouping Logic Settings</h3>
+                        <p style="margin:0 0 16px;font-size:.82rem;color:var(--text-muted,#94a3b8);">Select which algos the grouping logic applies to. Algos marked ✓ exist in Server Info (client 1 → server A1).</p>
+                        <div id="grpSettingsAlgos" style="max-height:220px;overflow-y:auto;border:1px solid var(--border-color,#334155);border-radius:6px;padding:10px 14px;background:var(--bg-input,#0f172a);display:flex;flex-direction:column;gap:8px;">
+                            <span style="color:var(--text-muted,#94a3b8);font-size:.85rem;">Loading algos…</span>
+                        </div>
+                        <div id="grpSettingsErr" style="display:none;color:#f87171;font-size:.85rem;margin:10px 0 0;"></div>
+                        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+                            <button id="grpSettingsCancel" class="btn" style="background:var(--bg-hover,#334155);color:var(--text-primary,#e2e8f0);">Cancel</button>
+                            <button id="grpSettingsSave" class="btn btn-primary">Save</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Group Add/Edit Modal -->
@@ -738,12 +761,93 @@
             .finally(function () { saveBtn.disabled = false; saveBtn.textContent = "Save"; });
         });
 
-        /* Load groups when section becomes active */
+        /* ══ Grouping Settings modal ════════════════════════════════ */
+        function grpSettingsOpen() {
+            var modal = document.getElementById("grpSettingsModal");
+            var algosEl = document.getElementById("grpSettingsAlgos");
+            var errEl = document.getElementById("grpSettingsErr");
+            errEl.style.display = "none";
+            algosEl.innerHTML = "<span style='color:var(--text-muted,#94a3b8);font-size:.85rem;'>Loading…</span>";
+            modal.style.display = "flex";
+            Promise.all([
+                fetch("/api/client-algos").then(function(r){return r.json();}),
+                fetch("/api/group-settings").then(function(r){return r.json();})
+            ]).then(function(results) {
+                var algoRes = results[0], settRes = results[1];
+                var algos = (algoRes.success && algoRes.algos) ? algoRes.algos : [];
+                var selected = (settRes.success && settRes.applicable_algos) ? settRes.applicable_algos : [];
+                if (!algos.length) {
+                    algosEl.innerHTML = "<span style='color:var(--text-muted,#94a3b8);font-size:.85rem;'>No algos found in clients table.</span>";
+                    return;
+                }
+                algosEl.innerHTML = algos.map(function(a) {
+                    var chk = selected.indexOf(a.client_algo) !== -1 ? " checked" : "";
+                    return "<label style='display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem;color:var(--text-primary,#e2e8f0);'>" +
+                        "<input type='checkbox' value='" + esc(a.client_algo) + "'" + chk + " style='accent-color:var(--accent,#3b82f6);'>" +
+                        esc(a.client_algo) +
+                        "</label>";
+                }).join("");
+            }).catch(function() {
+                algosEl.innerHTML = "<span style='color:#f87171;font-size:.85rem;'>Failed to load algos.</span>";
+            });
+        }
+
+        document.getElementById("grpSettingsBtn").addEventListener("click", grpSettingsOpen);
+        document.getElementById("grpSettingsCancel").addEventListener("click", function() {
+            document.getElementById("grpSettingsModal").style.display = "none";
+        });
+        document.getElementById("grpSettingsModal").addEventListener("click", function(e) {
+            if (e.target === this) this.style.display = "none";
+        });
+        document.getElementById("grpSettingsSave").addEventListener("click", function() {
+            var saveBtn = document.getElementById("grpSettingsSave");
+            var errEl = document.getElementById("grpSettingsErr");
+            var checked = document.querySelectorAll("#grpSettingsAlgos input[type=checkbox]:checked");
+            var algos = Array.prototype.map.call(checked, function(c) { return c.value; });
+            errEl.style.display = "none";
+            saveBtn.disabled = true; saveBtn.textContent = "Saving…";
+            fetch("/api/group-settings/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ applicable_algos: algos })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success) {
+                    document.getElementById("grpSettingsModal").style.display = "none";
+                    grpShowResult(true, "Settings saved.");
+                    grpRefreshApplicable();
+                } else {
+                    errEl.textContent = d.error || "Save failed.";
+                    errEl.style.display = "block";
+                }
+            })
+            .catch(function() { errEl.textContent = "Network error."; errEl.style.display = "block"; })
+            .finally(function() { saveBtn.disabled = false; saveBtn.textContent = "Save"; });
+        });
+
+                /* Load groups when section becomes active */
+        function grpRefreshApplicable() {
+            fetch("/api/group-settings")
+                .then(function(r){return r.json();})
+                .then(function(d) {
+                    var algos = (d.success && d.applicable_algos && d.applicable_algos.length) ? d.applicable_algos : [];
+                    var display = document.getElementById("grpApplicableDisplay");
+                    var tags = document.getElementById("grpApplicableTags");
+                    if (!display || !tags) return;
+                    if (!algos.length) { display.style.display = "none"; return; }
+                    display.style.display = "block";
+                    tags.innerHTML = algos.map(function(a) {
+                        return "<span style='background:var(--accent,#3b82f6);color:#fff;border-radius:4px;padding:2px 8px;font-size:.8rem;font-weight:600;'>" + esc(a) + "</span>";
+                    }).join("");
+                }).catch(function(){});
+        }
+
         var grpLoaded = false;
         navBtns.forEach(function (btn) {
             if (btn.getAttribute("data-acp") === "grouping-setting") {
                 btn.addEventListener("click", function () {
-                    if (!grpLoaded) { grpLoaded = true; grpLoad(); }
+                    if (!grpLoaded) { grpLoaded = true; grpLoad(); grpRefreshApplicable(); }
                 });
             }
         });

@@ -101,6 +101,11 @@ GROUP_SCHEMA = {
     "group_def":  "VARCHAR(50)",
 }
 
+GROUP_CONFIG_SCHEMA = {
+    "config_key": "VARCHAR(50)",
+    "config_val": "TEXT",
+}
+
 
 def load_environment() -> None:
     """
@@ -881,6 +886,44 @@ def initialize_group_table(
         )
 
 
+def sync_group_config_schema(
+    connection: pymysql.connections.Connection,
+    database_name: str,
+) -> None:
+    sync_table_schema(
+        connection=connection,
+        database_name=database_name,
+        table_name="group_config",
+        required_columns=GROUP_CONFIG_SCHEMA,
+    )
+
+
+def initialize_group_config_table(
+    connection: pymysql.connections.Connection,
+    database_name: str,
+) -> None:
+    """Creates or syncs the group_config key-value config table."""
+    table_name = "group_config"
+    log_info(module=MODULE_NAME, action="initialize_group_config_table",
+             message="Checking group_config table", status="STARTED")
+
+    if table_exists(connection, database_name, table_name):
+        sync_group_config_schema(connection=connection, database_name=database_name)
+    else:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE group_config (
+                    config_key VARCHAR(50) NOT NULL,
+                    config_val TEXT,
+                    PRIMARY KEY (config_key)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """
+            )
+        log_info(module=MODULE_NAME, action="create_group_config_table",
+                 message="Table 'group_config' created successfully", status="SUCCESS")
+
+
 def initialize_database() -> None:
     """
     Main function to initialize CMP database and required base tables.
@@ -889,24 +932,23 @@ def initialize_database() -> None:
     log_startup_banner()
 
     load_environment()
-
     config = get_mysql_config()
+    validate_mysql_config(config)
+
     database_name = config["database"]
 
     log_info(
         module=MODULE_NAME,
         action="initialize_database",
-        message=f"Starting database initialization for '{database_name}'",
+        message="Starting database initialization",
         status="STARTED",
     )
 
     try:
-        validate_mysql_config(config)
-
         log_info(
             module=MODULE_NAME,
             action="mysql_connection_without_database",
-            message=f"Connecting to MySQL server at {config['host']}:{config['port']}",
+            message="Connecting to MySQL server",
             status="STARTED",
         )
 
@@ -934,9 +976,7 @@ def initialize_database() -> None:
                     message=f"Database '{database_name}' does not exist. Creating now.",
                     status="STARTED",
                 )
-
                 create_database(server_connection, database_name)
-
                 log_info(
                     module=MODULE_NAME,
                     action="create_database",
@@ -946,20 +986,12 @@ def initialize_database() -> None:
 
         finally:
             server_connection.close()
-
             log_info(
                 module=MODULE_NAME,
                 action="mysql_connection_without_database",
                 message="MySQL server connection closed",
                 status="SUCCESS",
             )
-
-        log_info(
-            module=MODULE_NAME,
-            action="mysql_connection_with_database",
-            message=f"Connecting to database '{database_name}'",
-            status="STARTED",
-        )
 
         db_connection = get_mysql_connection_with_database(config)
 
@@ -976,11 +1008,6 @@ def initialize_database() -> None:
                 database_name=database_name,
             )
 
-            initialize_server_info_table(
-                connection=db_connection,
-                database_name=database_name,
-            )
-
             initialize_clients_table(
                 connection=db_connection,
                 database_name=database_name,
@@ -991,9 +1018,13 @@ def initialize_database() -> None:
                 database_name=database_name,
             )
 
+            initialize_group_config_table(
+                connection=db_connection,
+                database_name=database_name,
+            )
+
         finally:
             db_connection.close()
-
             log_info(
                 module=MODULE_NAME,
                 action="mysql_connection_with_database",
@@ -1001,18 +1032,11 @@ def initialize_database() -> None:
                 status="SUCCESS",
             )
 
-        log_info(
-            module=MODULE_NAME,
-            action="initialize_database",
-            message=f"Database initialization completed for '{database_name}'",
-            status="SUCCESS",
-        )
-
     except Exception as exc:
         log_error(
             module=MODULE_NAME,
             action="initialize_database",
-            message=f"Database initialization failed for '{database_name}'",
+            message="Database initialization failed",
             error=exc,
             status="FAILED",
         )

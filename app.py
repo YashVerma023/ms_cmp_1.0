@@ -2426,8 +2426,108 @@ def api_delete_group():
 
 
 # =========================
-# Error Handlers
+# Group Settings API
 # =========================
+
+
+@app.route("/api/client-algos", methods=["GET"])
+@login_required
+def api_get_client_algos():
+    """Returns distinct algo values from clients, with server_info cross-check."""
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DISTINCT algo FROM clients "
+                    "WHERE algo IS NOT NULL AND algo != '' ORDER BY algo"
+                )
+                client_rows = cur.fetchall()
+                client_algos = [row["algo"] for row in client_rows]
+
+                cur.execute(
+                    "SELECT DISTINCT Algo FROM server_info "
+                    "WHERE Algo IS NOT NULL AND Algo != ''"
+                )
+                server_algo_rows = cur.fetchall()
+                server_algos = {row["Algo"] for row in server_algo_rows}
+        finally:
+            conn.close()
+
+        result = []
+        for algo in client_algos:
+            server_key = "A" + str(algo)
+            result.append({
+                "client_algo": algo,
+                "server_algo": server_key,
+                "in_server": server_key in server_algos,
+            })
+        return jsonify({"success": True, "algos": result}), 200
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_client_algos",
+                  message="Failed to fetch client algos", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not fetch algos."}), 500
+
+
+
+
+@app.route("/api/group-settings", methods=["GET"])
+@login_required
+def api_get_group_settings():
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT config_val FROM group_config "
+                    "WHERE config_key = 'applicable_algos'"
+                )
+                row = cur.fetchone()
+        finally:
+            conn.close()
+        val = row["config_val"] if row else ""
+        algos = [a.strip() for a in val.split(",") if a.strip()] if val else []
+        return jsonify({"success": True, "applicable_algos": algos}), 200
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_get_group_settings",
+                  message="Failed to fetch group settings", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not fetch settings."}), 500
+
+
+@app.route("/api/group-settings/update", methods=["POST"])
+@login_required
+def api_update_group_settings():
+    if session.get("role") not in ("superadmin", "admin"):
+        return jsonify({"success": False, "error": "Permission denied."}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        algos = data.get("applicable_algos", [])
+        if not isinstance(algos, list):
+            return jsonify({"success": False, "error": "applicable_algos must be a list."}), 400
+        val = ", ".join(str(a).strip() for a in algos if str(a).strip())
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO group_config (config_key, config_val) VALUES ('applicable_algos', %s) "
+                    "ON DUPLICATE KEY UPDATE config_val = %s",
+                    (val, val),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+        log_update(module=MODULE_NAME, action="api_update_group_settings",
+                   message=f"Group settings updated by {session.get('email')}: algos={val}",
+                   status="SUCCESS")
+        return jsonify({"success": True, "message": "Settings saved."}), 200
+    except Exception as exc:
+        log_error(module=MODULE_NAME, action="api_update_group_settings",
+                  message="Failed to save group settings", error=exc, status="FAILED")
+        return jsonify({"success": False, "error": "Could not save settings."}), 500
 
 
 @app.errorhandler(404)
