@@ -203,10 +203,28 @@
                                 </div>
                             </div>
                             <div class="field-row">
-                                <label class="field-label">Algo</label>
+                                <label class="field-label">Algo <span class="req-star">*</span></label>
                                 <div class="field-wrap">
                                     <input class="form-control" type="text" name="algo"
-                                        maxlength="10" placeholder="Algo type (max 10 chars)">
+                                        maxlength="10" required placeholder="Algo type (max 10 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Auto Assign Server</label>
+                                <div class="field-wrap">
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
+                                        <input type="checkbox" name="auto_assign_server" id="autoAssignServer" checked
+                                            style="accent-color:var(--accent,#3b82f6);width:16px;height:16px;">
+                                        <span style="font-size:.85rem;color:var(--text-muted,#94a3b8);">Auto assign best server based on algo &amp; grouping logic</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="field-row" id="serverManualRow" style="display:none;">
+                                <label class="field-label">Server <span class="req-star">*</span></label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="server" id="serverManualInput"
+                                        maxlength="10" placeholder="Server name (max 10 chars)">
+                                    <small id="serverFromDealerHint" style="display:none;color:var(--accent,#3b82f6);font-size:.8rem;">Auto-filled from Dealer ID mapping</small>
                                 </div>
                             </div>
                             <div class="field-row">
@@ -217,10 +235,10 @@
                                 </div>
                             </div>
                             <div class="field-row">
-                                <label class="field-label">Category</label>
+                                <label class="field-label">Category <span class="req-star">*</span></label>
                                 <div class="field-wrap">
                                     <input class="form-control" type="text" name="Category"
-                                        maxlength="20" placeholder="Category (max 20 chars)">
+                                        maxlength="20" required placeholder="Category (max 20 chars)">
                                 </div>
                             </div>
                             <div class="field-row">
@@ -235,6 +253,24 @@
                                 <div class="field-wrap">
                                     <input class="form-control" type="text" name="Acc Type"
                                         maxlength="20" placeholder="Account type (max 20 chars)">
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Dealer ID</label>
+                                <div class="field-wrap">
+                                    <input class="form-control" type="text" name="DealerID" id="dealerIdInput"
+                                        maxlength="30" placeholder="Dealer ID (max 30 chars)">
+                                    <small id="dealerHint" style="display:none;color:var(--accent,#3b82f6);font-size:.8rem;">Will be auto-assigned based on server</small>
+                                </div>
+                            </div>
+                            <div class="field-row">
+                                <label class="field-label">Assign Dealer ID</label>
+                                <div class="field-wrap">
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:4px;">
+                                        <input type="checkbox" name="assign_dealer_id" id="assignDealerId"
+                                            style="accent-color:var(--accent,#3b82f6);width:16px;height:16px;">
+                                        <span style="font-size:.85rem;color:var(--text-muted,#94a3b8);">Auto assign a Dealer ID (max 20 clients per dealer under assigned server)</span>
+                                    </label>
                                 </div>
                             </div>
 
@@ -567,6 +603,77 @@
 
         bindForm("addUserForm",   "/admin-panel/add-user",   "addUserSubmitBtn",   "addUserResult",   "Add User");
         bindForm("addClientForm", "/admin-panel/add-client", "addClientSubmitBtn", "addClientResult", "Save Client");
+
+        /* Auto-assign + dealer interactivity */
+        (function() {
+            var autoChk        = document.getElementById("autoAssignServer");
+            var dealerChk      = document.getElementById("assignDealerId");
+            var dealerInp      = document.getElementById("dealerIdInput");
+            var dealerHint     = document.getElementById("dealerHint");
+            var serverRow      = document.getElementById("serverManualRow");
+            var serverInp      = document.getElementById("serverManualInput");
+            var serverFromHint = document.getElementById("serverFromDealerHint");
+            var dealerLookupTimer = null;
+
+            function syncAll() {
+                if (!autoChk) return;
+                var autoOn     = autoChk.checked;
+                var hasDealer  = dealerInp && dealerInp.value.trim() !== "";
+                var dealerOn   = dealerChk && dealerChk.checked;
+
+                /* Server field: show only when auto-assign is OFF and no dealer entered */
+                if (serverRow) serverRow.style.display = (!autoOn) ? "flex" : "none";
+
+                /* Assign Dealer ID checkbox: disable when dealer is typed manually */
+                if (dealerChk) {
+                    dealerChk.disabled = hasDealer;
+                    if (hasDealer) dealerChk.checked = false;
+                }
+
+                /* Dealer ID input: disable + hint when auto-assign on and dealerChk on */
+                if (dealerInp) {
+                    var autoFillDealer = autoOn && dealerOn && !hasDealer;
+                    dealerInp.disabled = autoFillDealer;
+                    if (dealerHint) dealerHint.style.display = autoFillDealer ? "block" : "none";
+                    if (autoFillDealer) { dealerInp.value = ""; dealerInp.placeholder = "Will be auto-assigned"; }
+                    else if (!hasDealer) { dealerInp.placeholder = "Dealer ID (max 30 chars)"; }
+                }
+            }
+
+            function onDealerInput() {
+                var val = dealerInp ? dealerInp.value.trim() : "";
+                syncAll();
+                /* If dealer ID entered and auto-assign is OFF, look up server */
+                if (val && autoChk && !autoChk.checked && serverInp) {
+                    clearTimeout(dealerLookupTimer);
+                    dealerLookupTimer = setTimeout(function() {
+                        fetch("/api/dealer-server?dealer_id=" + encodeURIComponent(val))
+                            .then(function(r) { return r.json(); })
+                            .then(function(d) {
+                                if (d.server) {
+                                    serverInp.value = d.server;
+                                    serverInp.readOnly = true;
+                                    serverInp.style.opacity = "0.7";
+                                    if (serverFromHint) serverFromHint.style.display = "block";
+                                } else {
+                                    serverInp.readOnly = false;
+                                    serverInp.style.opacity = "1";
+                                    if (serverFromHint) serverFromHint.style.display = "none";
+                                }
+                            }).catch(function() {});
+                    }, 500);
+                } else if (!val && serverInp) {
+                    serverInp.readOnly = false;
+                    serverInp.style.opacity = "1";
+                    if (serverFromHint) serverFromHint.style.display = "none";
+                }
+            }
+
+            if (autoChk)  autoChk.addEventListener("change", syncAll);
+            if (dealerChk) dealerChk.addEventListener("change", syncAll);
+            if (dealerInp) dealerInp.addEventListener("input", onDealerInput);
+            syncAll();
+        }());
         bindForm("addServerForm", "/admin-panel/add-server", "addServerSubmitBtn", "addServerResult", "Add Server");
 
         /* ── Bulk upload forms (file uploads — use FormData directly) ── */

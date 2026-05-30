@@ -119,6 +119,11 @@
                         <span class="tables-record-count" id="serverCount"></span>
                         <button id="serverDownloadBtn" title="Download CSV (selected or filtered)" style="background:none;border:1px solid var(--border-color,#334155);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:1rem;color:var(--text-muted,#94a3b8);" onclick="downloadTableCSV('serverTableArea','server_info.csv')">&#x2B73;</button>
                     </div>
+                    <div id="serverActionBar" style="display:none;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border);align-items:center;gap:12px;flex-wrap:wrap;">
+                        <span id="serverSelectedCount" style="font-size:13px;font-weight:600;color:var(--primary);min-width:90px;"></span>
+                        <button id="serverDeleteBtn" class="btn" style="font-size:13px;background:var(--danger,#ef4444);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;">🗑 Delete Selected</button>
+                        <span id="serverActionResult" style="font-size:12px;margin-left:4px;"></span>
+                    </div>
                     <div id="serverTableArea">
                         <div class="table-loading">Click the tab to load server data…</div>
                     </div>
@@ -129,6 +134,11 @@
                     <div class="tables-header">
                         <h2>Server Mapping</h2>
                         <span class="tables-record-count" id="serverMappingCount"></span>
+                    </div>
+                    <div id="serverMappingActionBar" style="display:none;padding:10px 16px;background:var(--bg-card);border-bottom:1px solid var(--border);align-items:center;gap:12px;flex-wrap:wrap;">
+                        <span id="serverMappingSelectedCount" style="font-size:13px;font-weight:600;color:var(--primary);min-width:90px;"></span>
+                        <button id="serverMappingDeleteBtn" class="btn" style="font-size:13px;background:var(--danger,#ef4444);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;">🗑 Delete Selected</button>
+                        <span id="serverMappingActionResult" style="font-size:12px;margin-left:4px;"></span>
                     </div>
                     <div id="serverMappingTableArea">
                         <div class="table-loading">Click the tab to load server mapping…</div>
@@ -557,6 +567,44 @@
 
                 serverLoaded = true;
                 serverConfigTable.render(sRes.servers || []);
+
+                /* Server Config action bar */
+                document.getElementById("serverTableArea").addEventListener("change", function(e) {
+                    if (!e.target.classList.contains("row-chk") && !e.target.classList.contains("chk-all")) return;
+                    var checked = document.querySelectorAll("#serverTableArea .row-chk:checked");
+                    var bar = document.getElementById("serverActionBar");
+                    var cnt = document.getElementById("serverSelectedCount");
+                    if (checked.length) {
+                        bar.style.display = "flex";
+                        cnt.textContent = checked.length + " selected";
+                    } else {
+                        bar.style.display = "none";
+                    }
+                });
+                document.getElementById("serverDeleteBtn").addEventListener("click", function() {
+                    var checked = document.querySelectorAll("#serverTableArea .row-chk:checked");
+                    if (!checked.length) return;
+                    var servers = Array.prototype.map.call(checked, function(c) { return c.getAttribute("data-pk"); });
+                    if (!confirm("Delete " + servers.length + " server(s)?\n" + servers.join(", "))) return;
+                    fetch("/api/servers/delete", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({servers: servers})
+                    }).then(function(r){return r.json();})
+                    .then(function(d) {
+                        var res = document.getElementById("serverActionResult");
+                        if (d.success) {
+                            servers.forEach(function(pk) {
+                                var tr = document.querySelector("#serverTableArea tr[data-pk='" + pk + "']");
+                                if (tr) tr.remove();
+                            });
+                            document.getElementById("serverActionBar").style.display = "none";
+                            res.textContent = d.message || "Deleted.";
+                        } else {
+                            res.textContent = d.error || "Delete failed.";
+                        }
+                    }).catch(function(){ document.getElementById("serverActionResult").textContent = "Network error."; });
+                });
             }).catch(function () {
                 document.getElementById("serverTableArea").innerHTML =
                     "<div class='table-error'>Network error. Could not load server data.</div>";
@@ -608,6 +656,44 @@
 
                 serverMappingLoaded = true;
                 serverMappingTable.render(sRes.servers || []);
+
+                /* Server Mapping action bar */
+                document.getElementById("serverMappingTableArea").addEventListener("change", function(e) {
+                    if (!e.target.classList.contains("row-chk") && !e.target.classList.contains("chk-all")) return;
+                    var checked = document.querySelectorAll("#serverMappingTableArea .row-chk:checked");
+                    var bar = document.getElementById("serverMappingActionBar");
+                    var cnt = document.getElementById("serverMappingSelectedCount");
+                    if (checked.length) {
+                        bar.style.display = "flex";
+                        cnt.textContent = checked.length + " selected";
+                    } else {
+                        bar.style.display = "none";
+                    }
+                });
+                document.getElementById("serverMappingDeleteBtn").addEventListener("click", function() {
+                    var checked = document.querySelectorAll("#serverMappingTableArea .row-chk:checked");
+                    if (!checked.length) return;
+                    var servers = Array.prototype.map.call(checked, function(c) { return c.getAttribute("data-pk"); });
+                    if (!confirm("Delete " + servers.length + " server(s)?\n" + servers.join(", "))) return;
+                    fetch("/api/servers/delete", {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({servers: servers})
+                    }).then(function(r){return r.json();})
+                    .then(function(d) {
+                        var res = document.getElementById("serverMappingActionResult");
+                        if (d.success) {
+                            servers.forEach(function(pk) {
+                                var tr = document.querySelector("#serverMappingTableArea tr[data-pk='" + pk + "']");
+                                if (tr) tr.remove();
+                            });
+                            document.getElementById("serverMappingActionBar").style.display = "none";
+                            res.textContent = d.message || "Deleted.";
+                        } else {
+                            res.textContent = d.error || "Delete failed.";
+                        }
+                    }).catch(function(){ document.getElementById("serverMappingActionResult").textContent = "Network error."; });
+                });
             }).catch(function () {
                 document.getElementById("serverMappingTableArea").innerHTML =
                     "<div class='table-error'>Network error. Could not load server mapping.</div>";
